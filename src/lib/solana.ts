@@ -7,6 +7,7 @@ import {
   sendAndConfirmTransaction,
   PublicKey,
   clusterApiUrl,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
@@ -36,17 +37,27 @@ function getKeypair(): Keypair {
   return _keypair;
 }
 
-export async function airdropIfNeeded(): Promise<void> {
+async function ensureFunded(): Promise<boolean> {
   const keypair = getKeypair();
   try {
     const balance = await connection.getBalance(keypair.publicKey);
-    if (balance < 0.05 * 1e9) {
-      await connection.requestAirdrop(keypair.publicKey, 1e9); // 1 SOL
-      // Wait a moment for airdrop to land
-      await new Promise((r) => setTimeout(r, 2000));
+    if (balance >= 0.01 * LAMPORTS_PER_SOL) return true;
+
+    // Try airdrop
+    try {
+      const sig = await connection.requestAirdrop(keypair.publicKey, LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig, "confirmed");
+      return true;
+    } catch {
+      // Airdrop rate-limited or failed
+      console.warn(
+        `[Solana] Wallet ${keypair.publicKey.toBase58()} has no SOL. ` +
+        `Visit https://faucet.solana.com to fund it on devnet.`
+      );
+      return false;
     }
   } catch {
-    // Airdrop failures are non-fatal
+    return false;
   }
 }
 
@@ -61,7 +72,10 @@ export interface TradeRecord {
 export async function recordTradeOnChain(trade: TradeRecord): Promise<string> {
   const keypair = getKeypair();
 
-  await airdropIfNeeded();
+  const funded = await ensureFunded();
+  if (!funded) {
+    throw new Error("Solana wallet has no SOL — skipping on-chain recording");
+  }
 
   const memo = JSON.stringify({
     app: "QuantQuest",

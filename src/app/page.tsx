@@ -22,10 +22,12 @@ import {
 } from "lucide-react";
 import {
   apiCreatePortfolio,
+  apiFetchPortfolio,
   loadPortfolio,
   getDefaultPortfolio,
   savePortfolio,
   getUserId,
+  setUserId,
 } from "@/lib/portfolio";
 
 const features = [
@@ -70,11 +72,29 @@ const features = [
 export default function LandingPage() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"create" | "login">("create");
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleStart = async () => {
     if (!username.trim() || loading) return;
     setLoading(true);
+    setError(null);
+
+    // Check if username already exists — prompt to log in instead
+    try {
+      const checkRes = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim() }),
+      });
+      if (checkRes.ok) {
+        setError("An account with that name already exists. Switch to login to access it.");
+        setLoading(false);
+        return;
+      }
+    } catch { /* connectivity issue — proceed with create */ }
+
     try {
       await apiCreatePortfolio(username.trim());
     } catch {
@@ -97,6 +117,46 @@ export default function LandingPage() {
     router.push("/dashboard");
   };
 
+  const handleLogin = async () => {
+    if (!username.trim() || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error === "Account not found"
+          ? "No account found with that name. Try creating a new one."
+          : "Login failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      // Set the userId so subsequent API calls use this account
+      setUserId(data.userId);
+      // Fetch the full portfolio through the normal pipeline
+      // (runs simulateReturns, normalizes data, saves to localStorage)
+      const portfolio = await apiFetchPortfolio();
+      if (!portfolio) {
+        // Fallback: save what we got from login
+        savePortfolio({
+          userId: data.userId,
+          username: data.username,
+          holdings: data.portfolio.holdings,
+          history: data.portfolio.history,
+        });
+      }
+      router.push("/dashboard");
+    } catch {
+      setError("Connection error. Please try again.");
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg space-y-8">
@@ -115,37 +175,55 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* Login */}
+        {/* Auth card */}
         <Card className="border-primary/20 shadow-lg shadow-primary/5">
           <CardHeader>
-            <CardTitle className="text-xl">Start Your Portfolio</CardTitle>
+            <CardTitle className="text-xl">
+              {mode === "create" ? "Start Your Portfolio" : "Welcome Back"}
+            </CardTitle>
             <CardDescription>
-              Enter your name to get <span className="font-semibold text-foreground">$10,000</span> in simulated funds — no real money needed.
+              {mode === "create"
+                ? <>Create your account to get a <span className="font-semibold text-foreground">$10,000</span> bank balance — transfer funds to start investing.</>
+                : "Enter your name to log back into your existing portfolio."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder="Your name (e.g. Alex Chen)"
+              placeholder={mode === "create" ? "Your name (e.g. Alex Chen)" : "Your account name"}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleStart()}
+              onChange={(e) => { setUsername(e.target.value); setError(null); }}
+              onKeyDown={(e) => e.key === "Enter" && (mode === "create" ? handleStart() : handleLogin())}
               disabled={loading}
               className="h-11"
             />
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
             <Button
               className="w-full h-11 text-base font-semibold"
-              onClick={handleStart}
+              onClick={mode === "create" ? handleStart : handleLogin}
               disabled={loading || !username.trim()}
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Setting up your account...
+                  {mode === "create" ? "Setting up your account..." : "Logging in..."}
                 </>
+              ) : mode === "create" ? (
+                "Start Investing \u2192"
               ) : (
-                "Start Investing →"
+                "Log In \u2192"
               )}
             </Button>
+            <button
+              type="button"
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => { setMode(mode === "create" ? "login" : "create"); setError(null); }}
+            >
+              {mode === "create"
+                ? "Already have an account? Log in"
+                : "New here? Create an account"}
+            </button>
           </CardContent>
         </Card>
 

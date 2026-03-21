@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Portfolio } from "@/models/Portfolio";
 import { User } from "@/models/User";
+import { simulateReturns } from "@/lib/returns";
 
 // GET /api/portfolio?userId=xxx
 export async function GET(req: NextRequest) {
@@ -11,10 +12,33 @@ export async function GET(req: NextRequest) {
   }
 
   await connectDB();
-  const portfolio = await Portfolio.findOne({ userId }).lean();
+  const portfolio = await Portfolio.findOne({ userId });
 
   if (!portfolio) {
     return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
+  }
+
+  // Simulate one day of returns if we haven't already today
+  const today = new Date().toISOString().split("T")[0];
+  const lastEntry = portfolio.history[portfolio.history.length - 1];
+
+  if (!lastEntry || lastEntry.date !== today) {
+    // Apply returns to holdings (uses live market data when available)
+    await simulateReturns(portfolio.holdings);
+
+    // Compute new total portfolio value
+    const totalValue =
+      Math.round(
+        portfolio.holdings.reduce((sum: number, h: { amount: number }) => sum + h.amount, 0) * 100
+      ) / 100;
+
+    // Append today's history entry
+    portfolio.history.push({ date: today, value: totalValue });
+
+    // Persist changes
+    portfolio.markModified("holdings");
+    portfolio.markModified("history");
+    await portfolio.save();
   }
 
   return NextResponse.json(portfolio);
@@ -47,24 +71,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(existing);
   }
 
-  // Generate 30 days of mock history
+  // Start with $0 — user must transfer from Capital One bank account
   const today = new Date();
   const history: { date: string; value: number }[] = [];
-  let value = 10000;
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    value = value * (1 + (Math.random() - 0.48) * 0.03);
     history.push({
       date: date.toISOString().split("T")[0],
-      value: Math.round(value * 100) / 100,
+      value: 0,
     });
   }
 
   const portfolio = await Portfolio.create({
     userId,
     username,
-    holdings: [{ id: "cash", type: "safety", amount: 10000 }],
+    holdings: [{ id: "cash", type: "safety", amount: 0 }],
     history,
   });
 

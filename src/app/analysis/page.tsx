@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Brain, AlertTriangle, Sparkles, Scale, Loader2 } from "lucide-react";
+import { AchievementToast } from "@/components/AchievementToast";
+import { getUserId } from "@/lib/portfolio";
 import { sectors } from "@/data/sectors";
 import { strategies } from "@/data/strategies";
 import { safeties } from "@/data/safeties";
@@ -32,6 +34,7 @@ export default function AnalysisPage() {
   const [portfolio, setPortfolio] = useState<PortfolioState | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
+  const [newAchievements, setNewAchievements] = useState<string[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -69,8 +72,8 @@ export default function AnalysisPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ totalValue, allocation, holdings: holdingNames }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (res.ok && data.critic && data.optimist && data.realist) {
         setAnalysis(data);
       } else {
         setAnalysis({
@@ -79,6 +82,20 @@ export default function AnalysisPage() {
           realist: `Your portfolio is ${allocation.safety > totalValue * 0.5 ? "conservatively" : allocation.sector > totalValue * 0.5 ? "aggressively" : "moderately"} positioned with an estimated annual return of ${formatPercent(((allocation.sector * 0.12 + allocation.strategy * 0.10 + allocation.safety * 0.05) / Math.max(totalValue, 1)) * 100)}. Expect normal volatility of 10-15% annually. Key risk remains ${allocation.sector > allocation.strategy ? "sector concentration" : "strategy model risk"}.`,
         });
       }
+      // Gamification — non-blocking
+      try {
+        const gamRes = await fetch("/api/gamification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: getUserId(), action: "analyze" }),
+        });
+        if (gamRes.ok) {
+          const gamData = await gamRes.json();
+          if (gamData.newAchievements?.length > 0) {
+            setNewAchievements(gamData.newAchievements);
+          }
+        }
+      } catch { /* gamification non-fatal */ }
     } finally {
       setLoading(false);
     }
@@ -99,6 +116,14 @@ export default function AnalysisPage() {
 
   return (
     <div className="space-y-6">
+      {/* Achievement toast */}
+      {newAchievements.length > 0 && (
+        <AchievementToast
+          achievementIds={newAchievements}
+          onDismiss={() => setNewAchievements([])}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Portfolio Analysis</h1>

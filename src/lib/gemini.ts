@@ -16,7 +16,7 @@ export async function generateAnalysis(portfolio: {
   allocation: { sector: number; strategy: number; safety: number };
   holdings: string[];
 }): Promise<{ critic: string; optimist: string; realist: string }> {
-  const model = getClient().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getClient().getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `You are a world-class financial advisor AI analyzing a young investor's simulated portfolio on an educational investing platform called QuantQuest.
 
@@ -50,7 +50,7 @@ export async function generateInvestmentDescription(
   type: "sector" | "strategy" | "safety",
   existingDescription: string
 ): Promise<string> {
-  const model = getClient().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getClient().getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `You are a financial education AI. Write a compelling, beginner-friendly 2-sentence description for this investment product on a gamified investing platform:
 

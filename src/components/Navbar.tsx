@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { TrendingUp, BarChart3, ShoppingBag, Brain } from "lucide-react";
-import { loadPortfolio } from "@/lib/portfolio";
+import { TrendingUp, BarChart3, ShoppingBag, Brain, LogOut } from "lucide-react";
+import { loadPortfolio, clearSession } from "@/lib/portfolio";
 import { useEffect, useState } from "react";
 
 const links = [
@@ -15,12 +15,18 @@ const links = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     const p = loadPortfolio();
     if (p?.username) setUsername(p.username);
   }, []);
+
+  const handleLogout = () => {
+    clearSession();
+    router.push("/");
+  };
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -57,11 +63,21 @@ export function Navbar() {
         </div>
 
         {username && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
-              {username[0].toUpperCase()}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
+                {username[0].toUpperCase()}
+              </div>
+              <span className="hidden text-sm font-medium sm:block">{username}</span>
             </div>
-            <span className="hidden text-sm font-medium sm:block">{username}</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         )}
       </div>

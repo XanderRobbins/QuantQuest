@@ -1,14 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
+  ReferenceLine,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
 
@@ -16,9 +20,85 @@ interface Props {
   data: { date: string; value: number }[];
 }
 
+/** Simple seeded pseudo-random for deterministic noise */
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
 export function EquityCurve({ data }: Props) {
-  const isPositive = data.length >= 2 && data[data.length - 1].value >= data[0].value;
+  const isPositive =
+    data.length >= 2 && data[data.length - 1].value >= data[0].value;
   const color = isPositive ? "#22c55e" : "#ef4444";
+
+  const { combined, todayDate } = useMemo(() => {
+    if (data.length === 0) return { combined: [], todayDate: "" };
+
+    const lastPoint = data[data.length - 1];
+    const lastValue = lastPoint.value;
+    const lastDate = new Date(lastPoint.date);
+    const todayStr = lastPoint.date;
+
+    // Daily growth rates from annualized returns
+    const highDaily = Math.pow(1 + 0.15, 1 / 365) - 1;
+    const expectedDaily = Math.pow(1 + 0.08, 1 / 365) - 1;
+    const lowDaily = Math.pow(1 - 0.05, 1 / 365) - 1;
+
+    const rngHigh = seededRandom(42);
+    const rngExp = seededRandom(137);
+    const rngLow = seededRandom(256);
+
+    // Build historical rows (no projection fields)
+    const historicalRows = data.map((d) => ({
+      date: d.date,
+      value: d.value,
+      projHigh: undefined as number | undefined,
+      projExpected: undefined as number | undefined,
+      projLow: undefined as number | undefined,
+    }));
+
+    // The last historical point also seeds the projection lines
+    historicalRows[historicalRows.length - 1].projHigh = lastValue;
+    historicalRows[historicalRows.length - 1].projExpected = lastValue;
+    historicalRows[historicalRows.length - 1].projLow = lastValue;
+
+    // Build 30 days of projection
+    let highVal = lastValue;
+    let expVal = lastValue;
+    let lowVal = lastValue;
+    const projectionRows: typeof historicalRows = [];
+
+    for (let i = 1; i <= 30; i++) {
+      const d = new Date(lastDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split("T")[0];
+
+      // noise: gaussian-ish from uniform
+      const noiseH = (rngHigh() - 0.5) * 0.008;
+      const noiseE = (rngExp() - 0.5) * 0.006;
+      const noiseL = (rngLow() - 0.5) * 0.008;
+
+      highVal *= 1 + highDaily + noiseH;
+      expVal *= 1 + expectedDaily + noiseE;
+      lowVal *= 1 + lowDaily + noiseL;
+
+      projectionRows.push({
+        date: dateStr,
+        value: undefined as unknown as number,
+        projHigh: Math.round(highVal * 100) / 100,
+        projExpected: Math.round(expVal * 100) / 100,
+        projLow: Math.round(lowVal * 100) / 100,
+      });
+    }
+
+    return {
+      combined: [...historicalRows, ...projectionRows],
+      todayDate: todayStr,
+    };
+  }, [data]);
 
   return (
     <Card>
@@ -28,7 +108,7 @@ export function EquityCurve({ data }: Props) {
       <CardContent>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
+            <ComposedChart data={combined}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={color} stopOpacity={0.3} />
@@ -56,9 +136,47 @@ export function EquityCurve({ data }: Props) {
                   borderRadius: "8px",
                   color: "hsl(0 0% 95%)",
                 }}
-                formatter={(value) => [formatCurrency(value as number), "Value"]}
+                formatter={(value, name) => {
+                  if (value == null) return ["-", ""];
+                  const labels: Record<string, string> = {
+                    value: "Actual",
+                    projHigh: "High (+15%)",
+                    projExpected: "Expected (+8%)",
+                    projLow: "Low (-5%)",
+                  };
+                  return [formatCurrency(value as number), labels[name as string] ?? name];
+                }}
                 labelFormatter={(label) => `Date: ${label}`}
               />
+              <Legend
+                formatter={(value: string) => {
+                  const labels: Record<string, string> = {
+                    value: "Actual",
+                    projHigh: "High (+15%)",
+                    projExpected: "Expected (+8%)",
+                    projLow: "Low (-5%)",
+                  };
+                  return labels[value] ?? value;
+                }}
+              />
+
+              {/* Vertical divider at "today" */}
+              {todayDate && (
+                <ReferenceLine
+                  x={todayDate}
+                  stroke="hsl(0 0% 50%)"
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                  label={{
+                    value: "Today",
+                    position: "top",
+                    fill: "hsl(0 0% 60%)",
+                    fontSize: 11,
+                  }}
+                />
+              )}
+
+              {/* Historical area */}
               <Area
                 type="monotone"
                 dataKey="value"
@@ -66,8 +184,43 @@ export function EquityCurve({ data }: Props) {
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorValue)"
+                connectNulls={false}
+                dot={false}
+                legendType="square"
               />
-            </AreaChart>
+
+              {/* Projection lines */}
+              <Line
+                type="monotone"
+                dataKey="projHigh"
+                stroke="#22c55e"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                connectNulls={false}
+                legendType="plainline"
+              />
+              <Line
+                type="monotone"
+                dataKey="projExpected"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                connectNulls={false}
+                legendType="plainline"
+              />
+              <Line
+                type="monotone"
+                dataKey="projLow"
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                connectNulls={false}
+                legendType="plainline"
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </CardContent>

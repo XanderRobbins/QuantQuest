@@ -28,25 +28,36 @@ export function getUserId(): string {
   return userId;
 }
 
+export function setUserId(userId: string): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(USERID_KEY, userId);
+  }
+}
+
+export function clearSession(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(USERID_KEY);
+  }
+}
+
 export function getDefaultPortfolio(username: string): PortfolioState {
   const today = new Date();
   const history: { date: string; value: number }[] = [];
 
-  let value = 10000;
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    value = value * (1 + (Math.random() - 0.48) * 0.03);
     history.push({
       date: date.toISOString().split("T")[0],
-      value: Math.round(value * 100) / 100,
+      value: 0,
     });
   }
 
   return {
     userId: getUserId(),
     username,
-    holdings: [{ id: "cash", type: "safety", amount: 10000 }],
+    holdings: [{ id: "cash", type: "safety", amount: 0 }],
     history,
   };
 }
@@ -118,6 +129,30 @@ export async function apiInvest(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, targetId, targetType, amount }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const portfolio = normalizePortfolio(data);
+    savePortfolio(portfolio);
+    return {
+      portfolio,
+      solana: (data.solana as { signature: string; explorerUrl: string } | null) ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function apiSell(
+  targetId: string,
+  amount: number
+): Promise<InvestResult | null> {
+  const userId = getUserId();
+  try {
+    const res = await fetch("/api/invest", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, targetId, amount }),
     });
     if (!res.ok) return null;
     const data = await res.json();

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateAnalysis } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json(
+      { error: "GEMINI_API_KEY not configured" },
+      { status: 503 }
+    );
+  }
+
   try {
+    const { generateAnalysis } = await import("@/lib/gemini");
     const body = await req.json();
     const { totalValue, allocation, holdings } = body;
 

@@ -27,13 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (record) {
-    // Refresh balance from Nessie
-    try {
-      const account = await getAccount(record.accountId);
-      record.balance = account.balance;
-    } catch {
-      // use cached balance
-    }
+    // Use our tracked balance (Nessie sandbox doesn't auto-update on withdrawals/deposits)
     return NextResponse.json(record);
   }
 
