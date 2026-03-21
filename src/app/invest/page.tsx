@@ -272,130 +272,116 @@ export default function InvestPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Investment Marketplace</h1>
-          <p className="text-muted-foreground">
-            Explore sectors, strategies, and safe assets to build your portfolio
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet className="h-5 w-5 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary/80">Marketplace</span>
+          </div>
+          <h1 className="text-3xl font-black tracking-tight">Investment Marketplace</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Explore sectors, strategies, and safe assets
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card px-4 py-2.5 flex-shrink-0">
           <Wallet className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Cash:</span>
-          <span className="font-semibold">{formatCurrency(availableCash)}</span>
+          <span className="text-sm text-muted-foreground">Available:</span>
+          <span className="font-bold text-foreground">{formatCurrency(availableCash)}</span>
         </div>
       </div>
 
       {/* Category tabs — always visible at top */}
       <Tabs value={activeTab ?? ""} onValueChange={(v) => setActiveTab(v || undefined)}>
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="sectors" className={!activeTab ? "data-[state=active]:bg-transparent" : ""}>Sectors</TabsTrigger>
-          <TabsTrigger value="strategies" className={!activeTab ? "data-[state=active]:bg-transparent" : ""}>Strategies</TabsTrigger>
-          <TabsTrigger value="safeties" className={!activeTab ? "data-[state=active]:bg-transparent" : ""}>Safe Assets</TabsTrigger>
+        <TabsList className="grid-cols-3">
+          <TabsTrigger value="sectors">Sectors</TabsTrigger>
+          <TabsTrigger value="strategies">Strategies</TabsTrigger>
+          <TabsTrigger value="safeties">Safe Assets</TabsTrigger>
         </TabsList>
 
         {/* Default view: Trending + Recommended when no tab selected */}
         {!activeTab && (
           <div className="space-y-6 mt-4">
-            {/* Trending Today */}
+            {/* Trending Today — scrolls left */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Flame className="h-5 w-5 text-orange-500" />
                 <h2 className="text-xl font-semibold">Trending Today</h2>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {trending.map((item) => (
-                  <div
-                    key={item.id}
-                    className="block min-w-[180px] flex-shrink-0 cursor-pointer"
-                    onClick={() => setDetailId(item.id)}
-                  >
-                    <Card className="transition-all hover:shadow-md hover:border-primary/30">
-                      <CardContent className="p-4 space-y-2">
+              <div className="overflow-hidden">
+                <div className="flex gap-3 animate-marquee-left" style={{ width: "max-content" }}>
+                  {[...trending, ...trending].map((item, idx) => (
+                    <div
+                      key={`${item.id}-${idx}`}
+                      className="w-[168px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
+                      onClick={() => setDetailId(item.id)}
+                    >
+                      <div className="h-0.5 w-full" style={{ backgroundColor: item.color }} />
+                      <div className="p-3.5 space-y-2">
                         <div className="flex items-center gap-2">
                           <div
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="font-semibold text-sm truncate">
-                            {item.name}
-                          </span>
-                        </div>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {item.type}
-                        </Badge>
-                        <div className="flex items-center gap-1">
-                          {item.return1Y >= 0 ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                          )}
-                          <span
-                            className={`text-sm font-bold ${
-                              item.return1Y >= 0 ? "text-success" : "text-destructive"
-                            }`}
+                            className="h-6 w-6 rounded-md flex items-center justify-center"
+                            style={{ backgroundColor: `${item.color}20` }}
                           >
-                            {formatPercent(item.return1Y)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">1Y</span>
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                          </div>
+                          <span className="font-semibold text-sm truncate">{item.name}</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ))}
+                        <Badge variant="outline" className="text-[10px] capitalize">{item.type}</Badge>
+                        <div className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${
+                          item.return1Y >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                        }`}>
+                          {item.return1Y >= 0
+                            ? <TrendingUp className="h-3 w-3" />
+                            : <TrendingDown className="h-3 w-3" />
+                          }
+                          {formatPercent(item.return1Y)} 1Y
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Recommended For You */}
+            {/* Recommended For You — scrolls right */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-yellow-500" />
                 <h2 className="text-xl font-semibold">Recommended For You</h2>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {recommended.map((item) => (
-                  <div
-                    key={item.id}
-                    className="block min-w-[200px] flex-shrink-0 cursor-pointer"
-                    onClick={() => setDetailId(item.id)}
-                  >
-                    <Card className="transition-all hover:shadow-md hover:border-primary/30">
-                      <CardContent className="p-4 space-y-2">
+              <div className="overflow-hidden">
+                <div className="flex gap-3 animate-marquee-right" style={{ width: "max-content" }}>
+                  {[...recommended, ...recommended].map((item, idx) => (
+                    <div
+                      key={`${item.id}-${idx}`}
+                      className="w-[192px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
+                      onClick={() => setDetailId(item.id)}
+                    >
+                      <div className="h-0.5 w-full" style={{ backgroundColor: item.color }} />
+                      <div className="p-3.5 space-y-2">
                         <div className="flex items-center gap-2">
                           <div
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="font-semibold text-sm truncate">
-                            {item.name}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground italic">
-                          {item.reason}
-                        </p>
-                        <div className="flex items-center gap-1">
-                          {item.returnValue >= 0 ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                          )}
-                          <span
-                            className={`text-sm font-bold ${
-                              item.returnValue >= 0
-                                ? "text-success"
-                                : "text-destructive"
-                            }`}
+                            className="h-6 w-6 rounded-md flex items-center justify-center"
+                            style={{ backgroundColor: `${item.color}20` }}
                           >
-                            {formatPercent(item.returnValue)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.returnLabel}
-                          </span>
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                          </div>
+                          <span className="font-semibold text-sm truncate">{item.name}</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ))}
+                        <p className="text-[11px] text-muted-foreground italic">{item.reason}</p>
+                        <div className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${
+                          item.returnValue >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                        }`}>
+                          {item.returnValue >= 0
+                            ? <TrendingUp className="h-3 w-3" />
+                            : <TrendingDown className="h-3 w-3" />
+                          }
+                          {formatPercent(item.returnValue)} {item.returnLabel}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

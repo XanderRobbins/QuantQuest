@@ -6,10 +6,9 @@ import { apiFetchPortfolio, loadPortfolio, getTotalValue, getAllocationByType, a
 import { PortfolioMetrics } from "@/components/PortfolioMetrics";
 import { EquityCurve } from "@/components/EquityCurve";
 import { AllocationPieChart } from "@/components/AllocationPieChart";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Brain, ArrowDownToLine } from "lucide-react";
+import { ShoppingBag, Brain, ArrowDownToLine, TrendingUp } from "lucide-react";
 import { AchievementToast } from "@/components/AchievementToast";
 import { getUserId } from "@/lib/portfolio";
 import Link from "next/link";
@@ -45,8 +44,6 @@ export default function DashboardPage() {
     const result = await apiSell(holdingId, amount);
     if (result) {
       setPortfolio(result.portfolio);
-
-      // Gamification — non-blocking
       try {
         const gamRes = await fetch("/api/gamification", {
           method: "POST",
@@ -112,7 +109,6 @@ export default function DashboardPage() {
     { name: "Safeties", value: allocation.safety, color: "#22c55e", holdings: holdingsByType("safety") },
   ].filter((d) => d.value > 0);
 
-  // Build detailed holdings list
   const holdingDetails = portfolio.holdings
     .filter((h) => h.id !== "cash" || h.amount > 0)
     .map((h) => {
@@ -129,7 +125,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Achievement toast */}
       {newAchievements.length > 0 && (
         <AchievementToast
           achievementIds={newAchievements}
@@ -138,20 +133,27 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {portfolio.username}</h1>
-          <p className="text-muted-foreground">Here&apos;s your portfolio overview</p>
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-primary/80">Portfolio</span>
+          </div>
+          <h1 className="text-3xl font-black tracking-tight">
+            Welcome back,{" "}
+            <span className="text-gradient">{portfolio.username}</span>
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">Here&apos;s your portfolio overview</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 flex-shrink-0">
           <Link href="/invest">
-            <Button size="lg" className="gap-2">
+            <Button size="lg" className="gap-2 h-10">
               <ShoppingBag className="h-4 w-4" />
               Invest
             </Button>
           </Link>
           <Link href="/analysis">
-            <Button size="lg" variant="outline" className="gap-2">
+            <Button size="lg" variant="outline" className="gap-2 h-10">
               <Brain className="h-4 w-4" />
               Analysis
             </Button>
@@ -159,10 +161,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Capital One Bank Account */}
+      {/* Capital One Bank */}
       <NessieBalance portfolio={portfolio} onPortfolioUpdate={setPortfolio} />
 
-      {/* Gamification Profile */}
+      {/* Gamification */}
       <GameProfile />
 
       {/* Metrics */}
@@ -175,50 +177,53 @@ export default function DashboardPage() {
       />
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <EquityCurve data={portfolio.history} />
         <AllocationPieChart data={pieData} />
       </div>
 
-      {/* Holdings + Transaction History side-by-side */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Holdings + Transactions */}
+      <div className="grid gap-5 lg:grid-cols-2">
         {/* Holdings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Your Holdings</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
+            <h2 className="font-bold text-sm uppercase tracking-wide text-muted-foreground">Your Holdings</h2>
+            <span className="text-xs text-muted-foreground">
+              {holdingDetails.filter(h => h.id !== "cash" && h.amount > 0).length} positions
+            </span>
+          </div>
+          <div className="p-4">
             {holdingDetails.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No holdings yet. Start investing!</p>
+              <p className="text-muted-foreground text-sm py-4 text-center">No holdings yet. Start investing!</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {holdingDetails.map((h) => (
                   <div
                     key={h.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-3"
+                    className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2.5 hover:border-border/70 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="h-3 w-3 rounded-full"
+                        className="h-2 w-2 rounded-full flex-shrink-0"
                         style={{ backgroundColor: h.color }}
                       />
-                      <span className="font-medium">{h.name}</span>
-                      <Badge variant="secondary" className="text-xs capitalize">
+                      <span className="font-medium text-sm truncate">{h.name}</span>
+                      <Badge variant="secondary" className="text-[10px] capitalize px-1.5 py-0.5 flex-shrink-0">
                         {h.type}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold">{formatCurrency(h.amount)}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-bold text-sm">{formatCurrency(h.amount)}</span>
                       {h.id !== "cash" && h.amount > 0 && (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 gap-1 text-xs"
+                          className="h-7 gap-1 text-[11px] px-2"
                           disabled={sellingId === h.id}
                           onClick={() => handleSell(h.id, h.amount)}
                         >
                           <ArrowDownToLine className="h-3 w-3" />
-                          {sellingId === h.id ? "Selling..." : "Sell All"}
+                          {sellingId === h.id ? "..." : "Sell"}
                         </Button>
                       )}
                     </div>
@@ -226,8 +231,8 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Solana Transaction History */}
         <TransactionHistory />

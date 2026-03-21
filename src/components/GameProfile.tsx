@@ -67,7 +67,7 @@ export function GameProfile() {
         {/* Level Info */}
         <div>
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="font-semibold text-yellow-400">{level.name}</span>
+            <span className="font-semibold text-yellow-600 dark:text-yellow-400">{level.name}</span>
             <span className="text-muted-foreground">
               {profile.xp} / {level.nextLevelXp} XP
             </span>
@@ -88,7 +88,7 @@ export function GameProfile() {
               {unlockedCount}/{totalAchievements} Achievements
             </span>
           </div>
-          <span className="text-sm font-semibold text-yellow-400">
+          <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
             {profile.xp} XP Total
           </span>
         </div>

@@ -5,13 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   TrendingUp,
   BarChart3,
   Shield,
@@ -34,38 +27,44 @@ const features = [
   {
     icon: BarChart3,
     label: "Smart Sectors",
-    desc: "Invest in curated baskets",
-    color: "text-[#6366f1]",
+    desc: "Curated investment baskets",
+    color: "#6366f1",
+    bg: "bg-indigo-500/10",
   },
   {
     icon: Zap,
     label: "Quant Strategies",
     desc: "Algorithmic alpha",
-    color: "text-[#f97316]",
+    color: "#f97316",
+    bg: "bg-orange-500/10",
   },
   {
     icon: Shield,
     label: "Safe Assets",
-    desc: "Treasuries & more",
-    color: "text-[#22c55e]",
+    desc: "Treasuries & bonds",
+    color: "#22c55e",
+    bg: "bg-green-500/10",
   },
   {
     icon: Brain,
     label: "AI Analysis",
-    desc: "Gemini-powered",
-    color: "text-[#a855f7]",
+    desc: "Gemini-powered insights",
+    color: "#a855f7",
+    bg: "bg-purple-500/10",
   },
   {
     icon: Blocks,
     label: "On-Chain Trades",
     desc: "Solana verified",
-    color: "text-[#9945FF]",
+    color: "#9945FF",
+    bg: "bg-violet-500/10",
   },
   {
     icon: TrendingUp,
     label: "Live Portfolio",
     desc: "Real-time tracking",
-    color: "text-[#06b6d4]",
+    color: "#06b6d4",
+    bg: "bg-cyan-500/10",
   },
 ];
 
@@ -81,7 +80,6 @@ export default function LandingPage() {
     setLoading(true);
     setError(null);
 
-    // Check if username already exists — prompt to log in instead
     try {
       const checkRes = await fetch("/api/login", {
         method: "POST",
@@ -104,7 +102,6 @@ export default function LandingPage() {
       }
     }
 
-    // Fire-and-forget Nessie account creation
     try {
       const userId = getUserId();
       fetch("/api/nessie/account", {
@@ -136,13 +133,9 @@ export default function LandingPage() {
         return;
       }
       const data = await res.json();
-      // Set the userId so subsequent API calls use this account
       setUserId(data.userId);
-      // Fetch the full portfolio through the normal pipeline
-      // (runs simulateReturns, normalizes data, saves to localStorage)
       const portfolio = await apiFetchPortfolio();
       if (!portfolio) {
-        // Fallback: save what we got from login
         savePortfolio({
           userId: data.userId,
           username: data.username,
@@ -158,95 +151,107 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-lg space-y-8">
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-16 overflow-hidden">
+      {/* Decorative orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-cyan-500/8 blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-md space-y-8">
         {/* Hero */}
-        <div className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-3">
-            <div className="rounded-xl bg-primary/10 p-3">
-              <TrendingUp className="h-8 w-8 text-primary" />
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center gap-3 mb-2">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 ring-1 ring-primary/30 shadow-lg shadow-primary/20">
+              <TrendingUp className="h-6 w-6 text-primary" />
             </div>
-            <h1 className="text-5xl font-bold tracking-tight">
-              Quant<span className="text-primary">Quest</span>
-            </h1>
           </div>
-          <p className="text-muted-foreground text-lg max-w-sm mx-auto">
-            The investing platform built for your generation. Gamified, AI-powered, blockchain-verified.
+          <h1 className="text-6xl font-black tracking-tight">
+            Quant<span className="text-gradient">Quest</span>
+          </h1>
+          <p className="text-muted-foreground text-lg leading-relaxed max-w-sm mx-auto">
+            The investing platform built for your generation.
+            <br />
+            <span className="text-foreground/70">AI-powered. Gamified. Blockchain-verified.</span>
           </p>
         </div>
 
         {/* Auth card */}
-        <Card className="border-primary/20 shadow-lg shadow-primary/5">
-          <CardHeader>
-            <CardTitle className="text-xl">
+        <div className="rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm shadow-xl shadow-black/20 p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-bold">
               {mode === "create" ? "Start Your Portfolio" : "Welcome Back"}
-            </CardTitle>
-            <CardDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
               {mode === "create"
-                ? <>Create your account to get a <span className="font-semibold text-foreground">$10,000</span> bank balance — transfer funds to start investing.</>
-                : "Enter your name to log back into your existing portfolio."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              placeholder={mode === "create" ? "Your name (e.g. Alex Chen)" : "Your account name"}
-              value={username}
-              onChange={(e) => { setUsername(e.target.value); setError(null); }}
-              onKeyDown={(e) => e.key === "Enter" && (mode === "create" ? handleStart() : handleLogin())}
-              disabled={loading}
-              className="h-11"
-            />
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
+                ? <>Get a <span className="font-semibold text-foreground">$10,000</span> bank balance to start investing.</>
+                : "Enter your name to access your portfolio."}
+            </p>
+          </div>
+
+          <Input
+            placeholder={mode === "create" ? "Your name (e.g. Alex Chen)" : "Your account name"}
+            value={username}
+            onChange={(e) => { setUsername(e.target.value); setError(null); }}
+            onKeyDown={(e) => e.key === "Enter" && (mode === "create" ? handleStart() : handleLogin())}
+            disabled={loading}
+            className="h-11 bg-background/60"
+          />
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          <Button
+            className="w-full h-11 text-base font-semibold shadow-lg shadow-primary/25"
+            onClick={mode === "create" ? handleStart : handleLogin}
+            disabled={loading || !username.trim()}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {mode === "create" ? "Setting up..." : "Logging in..."}
+              </>
+            ) : mode === "create" ? (
+              "Start Investing →"
+            ) : (
+              "Log In →"
             )}
-            <Button
-              className="w-full h-11 text-base font-semibold"
-              onClick={mode === "create" ? handleStart : handleLogin}
-              disabled={loading || !username.trim()}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  {mode === "create" ? "Setting up your account..." : "Logging in..."}
-                </>
-              ) : mode === "create" ? (
-                "Start Investing \u2192"
-              ) : (
-                "Log In \u2192"
-              )}
-            </Button>
-            <button
-              type="button"
-              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => { setMode(mode === "create" ? "login" : "create"); setError(null); }}
-            >
-              {mode === "create"
-                ? "Already have an account? Log in"
-                : "New here? Create an account"}
-            </button>
-          </CardContent>
-        </Card>
+          </Button>
+
+          <button
+            type="button"
+            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { setMode(mode === "create" ? "login" : "create"); setError(null); }}
+          >
+            {mode === "create"
+              ? "Already have an account? Log in"
+              : "New here? Create an account"}
+          </button>
+        </div>
 
         {/* Feature grid */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
           {features.map((f) => {
             const Icon = f.icon;
             return (
               <div
                 key={f.label}
-                className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center"
+                className="flex flex-col items-center gap-2.5 rounded-xl border border-border/50 bg-card/60 p-3.5 text-center hover:border-border transition-colors"
               >
-                <Icon className={`h-6 w-6 ${f.color}`} />
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${f.bg}`}>
+                  <Icon className="h-4 w-4" style={{ color: f.color }} />
+                </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">{f.label}</p>
-                  <p className="text-xs text-muted-foreground">{f.desc}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{f.desc}</p>
                 </div>
               </div>
             );
           })}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs text-muted-foreground/60">
           Built for VandyHacks XII · Capital One Track · All trades are simulated
         </p>
       </div>

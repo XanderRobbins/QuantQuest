@@ -41,7 +41,7 @@ function TabsList({ className, children, ...props }: React.HTMLAttributes<HTMLDi
   return (
     <div
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+        "grid h-12 w-full items-center rounded-xl bg-muted p-1 text-muted-foreground",
         className
       )}
       {...props}
@@ -63,10 +63,10 @@ function TabsTrigger({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+        "flex h-full w-full items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
         ctx.value === value
           ? "bg-background text-foreground shadow-sm"
-          : "hover:bg-background/50 hover:text-foreground"
+          : "hover:bg-background/40 hover:text-foreground"
       )}
       onClick={() => ctx.onValueChange(value)}
       {...props}
