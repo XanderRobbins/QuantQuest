@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { TrendingUp, BarChart3, ShoppingBag, Brain, LogOut, Sun, Moon, ChevronDown } from "lucide-react";
+import { TrendingUp, BarChart3, ShoppingBag, Brain, Trophy, LogOut, Sun, Moon, ChevronDown } from "lucide-react";
 import { loadPortfolio, clearSession } from "@/lib/portfolio";
 import { useEffect, useRef, useState } from "react";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/invest", label: "Invest", icon: ShoppingBag },
+  { href: "/competition", label: "Competition", icon: Trophy },
   { href: "/analysis", label: "Analysis", icon: Brain },
 ];
 

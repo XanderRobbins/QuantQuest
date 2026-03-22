@@ -134,11 +134,17 @@ export async function POST(req: NextRequest) {
   updateHistory(portfolio);
   await persistPortfolio(portfolio);
 
-  // Fire off Solana recording in the background — don't block the response
-  recordTrade(userId, targetId, targetType, amount, "buy").catch(() => {});
+  // Record trade (MongoDB + Solana) and include status in response
+  const tradeResult = await recordTrade(userId, targetId, targetType, amount, "buy");
+  if (tradeResult.solanaError) {
+    console.error("[invest] Solana recording failed for buy:", tradeResult.solanaError);
+  }
 
   return NextResponse.json({
-    ...portfolio.toObject ? portfolio.toObject() : portfolio,
+    ...(portfolio.toObject ? portfolio.toObject() : portfolio),
+    solanaSignature: tradeResult.solanaSignature,
+    explorerUrl: tradeResult.explorerUrl,
+    solanaError: tradeResult.solanaError,
   });
 }
 
@@ -185,10 +191,16 @@ export async function DELETE(req: NextRequest) {
   updateHistory(portfolio);
   await persistPortfolio(portfolio);
 
-  // Fire off Solana recording in the background — don't block the response
-  recordTrade(userId, targetId, holding.type, amount, "sell").catch(() => {});
+  // Record trade (MongoDB + Solana) and include status in response
+  const tradeResult = await recordTrade(userId, targetId, holding.type, amount, "sell");
+  if (tradeResult.solanaError) {
+    console.error("[invest] Solana recording failed for sell:", tradeResult.solanaError);
+  }
 
   return NextResponse.json({
-    ...portfolio.toObject ? portfolio.toObject() : portfolio,
+    ...(portfolio.toObject ? portfolio.toObject() : portfolio),
+    solanaSignature: tradeResult.solanaSignature,
+    explorerUrl: tradeResult.explorerUrl,
+    solanaError: tradeResult.solanaError,
   });
 }

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(npm run:*)",
+      "Bash(curl -s \"http://api.nessieisreal.com\")",
+      "WebFetch(domain:api.nessieisreal.com)",
+      "Bash(curl -s --max-time 15 \"http://api.nessieisreal.com/api-docs\")",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c \"taskkill /PID 27740 /F\")",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const { Keypair } = require\\(''@solana/web3.js''\\); const kp = Keypair.generate\\(\\); console.log\\(''KEY='' + JSON.stringify\\(Array.from\\(kp.secretKey\\)\\)\\); console.log\\(''PUBKEY='' + kp.publicKey.toBase58\\(\\)\\);\")",
+      "Bash(node -e \":*)",
+      "Bash(curl:*)"
+    ]
+  }
+}

@@ -4,6 +4,13 @@ import { safeties } from "@/data/safeties";
 import type { IHolding } from "@/models/Portfolio";
 import { getLiveDailyChange } from "@/lib/market-data";
 
+/** Daily noise amplitude by asset class — safeties are near-deterministic */
+function getNoiseScale(holdingId: string): number {
+  if (safeties.find((s) => s.id === holdingId)) return 0.0001; // ±0.01%
+  if (strategies.find((s) => s.id === holdingId)) return 0.005; // ±0.5%
+  return 0.01; // ±1% for sectors (equities)
+}
+
 /**
  * Look up the annualized return for a holding and convert to a daily rate.
  * Sectors and strategies use return1Y (percentage), safeties use apy.
@@ -46,9 +53,9 @@ export async function simulateReturns(holdings: IHolding[]): Promise<IHolding[]>
         // Use real market daily change
         holding.amount = holding.amount * (1 + dailyReturn);
       } else {
-        // Fallback: expected return + noise
+        // Fallback: expected return + noise scaled to asset type
         const expected = getExpectedDailyReturn(holding.id);
-        const noise = (Math.random() - 0.5) * 0.01;
+        const noise = (Math.random() - 0.5) * getNoiseScale(holding.id);
         holding.amount = holding.amount * (1 + expected + noise);
       }
     }

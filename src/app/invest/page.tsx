@@ -309,10 +309,10 @@ export default function InvestPage() {
               </div>
               <div className="overflow-hidden">
                 <div className="flex gap-3 animate-marquee-left" style={{ width: "max-content" }}>
-                  {[...trending, ...trending].map((item, idx) => (
+                  {[...Array(8)].flatMap((_, ci) => trending.map((item) => ({ ...item, _ci: ci }))).map((item, idx) => (
                     <div
                       key={`${item.id}-${idx}`}
-                      className="w-[168px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
+                      className="w-[240px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
                       onClick={() => setDetailId(item.id)}
                     >
                       <div className="h-0.5 w-full" style={{ backgroundColor: item.color }} />
@@ -351,10 +351,10 @@ export default function InvestPage() {
               </div>
               <div className="overflow-hidden">
                 <div className="flex gap-3 animate-marquee-right" style={{ width: "max-content" }}>
-                  {[...recommended, ...recommended].map((item, idx) => (
+                  {[...Array(8)].flatMap((_, ci) => recommended.map((item) => ({ ...item, _ci: ci }))).map((item, idx) => (
                     <div
                       key={`${item.id}-${idx}`}
-                      className="w-[192px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
+                      className="w-[240px] flex-shrink-0 cursor-pointer rounded-xl border border-border/60 bg-card overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-border"
                       onClick={() => setDetailId(item.id)}
                     >
                       <div className="h-0.5 w-full" style={{ backgroundColor: item.color }} />

@@ -84,12 +84,22 @@ export async function GET(req: NextRequest) {
     Math.round(liveHoldings.reduce((s, h) => s + h.amount, 0) * 100) / 100;
   if (portfolioObj.history.length > 0) {
     portfolioObj.history[portfolioObj.history.length - 1].value = liveTotal;
+
+    // Persist the live total so other consumers (leaderboard, analytics) see it too
+    const dbHistory = portfolio.history;
+    if (dbHistory.length > 0) {
+      dbHistory[dbHistory.length - 1].value = liveTotal;
+      portfolio.markModified("history");
+      await portfolio.save();
+    }
   }
 
-  // Migration: seed totalDeposited from current value for accounts that predate the field
+  // Migration: seed totalDeposited for accounts that predate the field
   if (!portfolioObj.totalDeposited && liveTotal > 0) {
     portfolioObj.totalDeposited = liveTotal;
+    portfolioObj.baselineDeposited = liveTotal;
     portfolio.totalDeposited = liveTotal;
+    portfolio.baselineDeposited = liveTotal;
     await portfolio.save();
   }
 

@@ -128,7 +128,7 @@ export async function createWithdrawal(
   description: string
 ): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
-  await fetch(url(`/accounts/${accountId}/withdrawals`), {
+  const res = await fetch(url(`/accounts/${accountId}/withdrawals`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -139,5 +139,11 @@ export async function createWithdrawal(
       description,
     }),
   });
-  // Non-fatal — Nessie doesn't auto-update account balance anyway
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      (data as { message?: string }).message ?? `Nessie withdrawal failed (${res.status})`
+    );
+  }
 }

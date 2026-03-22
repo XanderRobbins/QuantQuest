@@ -18,7 +18,7 @@ export async function generateAnalysis(portfolio: {
 }): Promise<{ critic: string; optimist: string; realist: string }> {
   const model = getClient().getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const prompt = `You are a world-class financial advisor AI analyzing a young investor's simulated portfolio on an educational investing platform called QuantQuest.
+  const prompt = `You are a world-class financial advisor AI analyzing a young investor's simulated portfolio on QuantQuest, a gamified investing education platform.
 
 Portfolio details:
 - Total value: $${portfolio.totalValue.toFixed(2)}
@@ -27,13 +27,19 @@ Portfolio details:
 - Safety allocation: $${portfolio.allocation.safety.toFixed(2)}
 - Holdings: ${portfolio.holdings.join(", ") || "No active positions yet"}
 
-Provide three analysis perspectives. Each should be 3-4 sentences, insightful, specific to their holdings, and educational. Reference actual positions by name.
+Write three rich, detailed analysis perspectives. Each perspective must:
+- Open with a **bold one-sentence verdict** (e.g. **This portfolio carries significant concentration risk.**)
+- Follow with 4-6 bullet points using "- " prefix, each referencing specific holdings by name
+- Use **bold** for key terms, numbers, and important concepts
+- Use *italics* for caveats, nuance, and predictions
+- Close with a single *italicized takeaway sentence*
+- Be genuinely insightful and educational — explain the "why", not just the "what"
 
-Return ONLY valid JSON (no markdown fences) with these exact keys:
+Return ONLY valid JSON (no markdown code fences) with exactly these keys. The values must be markdown strings:
 {
-  "critic": "Focus on risks, overexposure, concentration, missing diversification, what could go wrong",
-  "optimist": "Focus on upside potential, strong positions, favorable catalysts, best-case scenarios",
-  "realist": "Balanced view, expected returns, realistic risks and rewards, most probable outcomes"
+  "critic": "The Critic perspective — focus on every risk: overexposure, concentration, missing diversification, macro vulnerabilities, what could blow up and why. Be specific and frank.",
+  "optimist": "The Optimist perspective — focus on every upside: strong positions, favorable sector tailwinds, compounding potential, best-case catalysts. Be enthusiastic but grounded.",
+  "realist": "The Realist perspective — the balanced, most-probable view: expected return range, realistic volatility, what's likely to happen, what to watch, and one actionable suggestion."
 }`;
 
   const result = await model.generateContent(prompt);

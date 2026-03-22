@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatPercent } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { CardVisual } from "@/components/CardVisual";
 
 interface Props {
   id: string;
@@ -35,41 +35,16 @@ export function InvestmentCard({
   type,
   returnValue,
   returnLabel,
-  extraInfo,
+  color,
   onInvest,
   onDetail,
 }: Props) {
-  const [aiDescription, setAiDescription] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-
   const riskVariant =
     risk === "High" || risk === "Very High"
       ? "destructive"
       : risk === "Medium"
       ? "warning"
       : "success";
-
-  const generateAiDescription = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (aiDescription || aiLoading) return;
-    setAiLoading(true);
-    try {
-      const res = await fetch("/api/generate-description", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type, existingDescription: description }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAiDescription(data.description);
-      }
-    } catch {
-      // keep original description
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const handleInvestClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -84,8 +59,10 @@ export function InvestmentCard({
       className="group relative flex flex-col rounded-xl border border-border bg-card overflow-hidden cursor-pointer transition-all duration-200 hover:border-primary/40 hover:shadow-md hover:shadow-primary/10 hover:-translate-y-0.5 h-full"
       onClick={() => onDetail(id)}
     >
-      {/* Blue top accent bar */}
-      <div className="h-0.5 w-full bg-primary/70" />
+      {/* Visual banner */}
+      <div className="w-full aspect-[14/5] overflow-hidden">
+        <CardVisual id={id} color={color} />
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between p-4 pb-3">
@@ -100,28 +77,14 @@ export function InvestmentCard({
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-          <button
-            onClick={generateAiDescription}
-            className="text-muted-foreground/50 hover:text-primary transition-colors cursor-pointer p-0.5"
-            title="Generate AI description"
-          >
-            <Sparkles className={`h-3.5 w-3.5 ${aiLoading ? "animate-pulse" : ""} ${aiDescription ? "text-primary" : ""}`} />
-          </button>
-          <Badge variant={riskVariant} className="text-[10px] px-1.5 py-0.5">{risk}</Badge>
-        </div>
+        <Badge variant={riskVariant} className="text-[10px] px-1.5 py-0.5 flex-shrink-0 ml-2">{risk}</Badge>
       </div>
 
       {/* Body */}
       <div className="flex-1 px-4 pb-3 space-y-2.5">
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-          {aiDescription ?? description}
+          {description}
         </p>
-        {aiDescription && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-primary/70 border border-primary/20 rounded-full px-2 py-0.5">
-            <Sparkles className="h-2.5 w-2.5" /> AI Enhanced
-          </span>
-        )}
         {returnValue !== undefined && (
           <div className="flex items-center gap-1.5">
             <div
@@ -140,9 +103,6 @@ export function InvestmentCard({
             </div>
             <span className="text-[10px] text-muted-foreground">{returnLabel ?? "1Y Return"}</span>
           </div>
-        )}
-        {extraInfo && (
-          <p className="text-[10px] text-muted-foreground/60 italic line-clamp-2">{extraInfo}</p>
         )}
       </div>
 
