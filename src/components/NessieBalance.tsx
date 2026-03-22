@@ -18,7 +18,7 @@ import {
   ArrowDownToLine,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { getUserId, savePortfolio, type PortfolioState } from "@/lib/portfolio";
+import { getUserId, savePortfolio, apiFetchPortfolio, getTotalValue, type PortfolioState } from "@/lib/portfolio";
 
 interface NessieData {
   accountId: string;
@@ -50,6 +50,7 @@ export function NessieBalance({ portfolio, onPortfolioUpdate }: Props) {
 
   const cashHolding = portfolio.holdings.find((h) => h.id === "cash");
   const portfolioCash = cashHolding?.amount ?? 0;
+  const totalPortfolioValue = getTotalValue(portfolio);
 
   const fetchBalance = useCallback(async () => {
     const userId = getUserId();
@@ -140,15 +141,24 @@ export function NessieBalance({ portfolio, onPortfolioUpdate }: Props) {
         setData({ ...data, balance: result.bankBalance });
       }
 
-      // Update portfolio
-      const updatedPortfolio: PortfolioState = {
-        userId: result.portfolio.userId,
-        username: result.portfolio.username,
-        holdings: result.portfolio.holdings,
-        history: result.portfolio.history,
-      };
-      savePortfolio(updatedPortfolio);
-      onPortfolioUpdate(updatedPortfolio);
+      // Fetch fresh portfolio so the GET route's live-patched history (including new cash) is used
+      const freshPortfolio = await apiFetchPortfolio();
+      if (freshPortfolio) {
+        onPortfolioUpdate(freshPortfolio);
+      } else {
+        // Fallback: use transfer response
+        const updatedPortfolio: PortfolioState = {
+          userId: result.portfolio.userId,
+          username: result.portfolio.username,
+          holdings: result.portfolio.holdings,
+          history: result.portfolio.history,
+          totalDeposited: result.portfolio.totalDeposited ?? 0,
+          baselineDeposited: result.portfolio.baselineDeposited ?? portfolio.baselineDeposited ?? 0,
+          dailyBaseline: result.portfolio.dailyBaseline ?? portfolio.dailyBaseline ?? null,
+        };
+        savePortfolio(updatedPortfolio);
+        onPortfolioUpdate(updatedPortfolio);
+      }
 
       setTransferSuccess(
         modal.direction === "deposit"
@@ -263,7 +273,7 @@ export function NessieBalance({ portfolio, onPortfolioUpdate }: Props) {
             <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">
-                  {modal.direction === "deposit" ? "Bank" : "Portfolio"}
+                  {modal.direction === "deposit" ? "Bank" : "Cash Available"}
                 </p>
                 <p className="font-semibold">
                   {formatCurrency(
@@ -273,17 +283,15 @@ export function NessieBalance({ portfolio, onPortfolioUpdate }: Props) {
                   )}
                 </p>
               </div>
-              <div className="text-muted-foreground px-3">
-                {modal.direction === "deposit" ? "→" : "→"}
-              </div>
+              <div className="text-muted-foreground px-3">→</div>
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">
-                  {modal.direction === "deposit" ? "Portfolio" : "Bank"}
+                  {modal.direction === "deposit" ? "Portfolio Total" : "Bank"}
                 </p>
                 <p className="font-semibold">
                   {formatCurrency(
                     modal.direction === "deposit"
-                      ? portfolioCash
+                      ? totalPortfolioValue
                       : (data?.balance ?? 0)
                   )}
                 </p>

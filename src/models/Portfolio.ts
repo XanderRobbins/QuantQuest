@@ -16,6 +16,10 @@ export interface IPortfolio extends Document {
   username: string;
   holdings: IHolding[];
   history: IHistoryEntry[];
+  dailyBaseline: Record<string, number> | null;
+  baselineDate: string;
+  totalDeposited: number;
+  baselineDeposited: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +47,10 @@ const PortfolioSchema = new Schema<IPortfolio>(
     username: { type: String, required: true },
     holdings: [HoldingSchema],
     history: [HistoryEntrySchema],
+    dailyBaseline: { type: Schema.Types.Mixed, default: null },
+    baselineDate: { type: String, default: "" },
+    totalDeposited: { type: Number, default: 0 },
+    baselineDeposited: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

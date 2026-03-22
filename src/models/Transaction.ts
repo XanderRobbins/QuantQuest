@@ -15,11 +15,12 @@ const TransactionSchema = new Schema<ITransaction>({
   investment: { type: String, required: true },
   type: { type: String, required: true },
   amount: { type: Number, required: true },
-  signature: { type: String, required: true },
-  explorerUrl: { type: String, required: true },
+  signature: { type: String, default: "pending" },
+  explorerUrl: { type: String, default: "" },
   timestamp: { type: Date, default: Date.now },
 });
 
-export const Transaction =
-  mongoose.models.Transaction ||
-  mongoose.model<ITransaction>("Transaction", TransactionSchema);
+// Delete cached model to ensure schema updates take effect
+delete mongoose.models.Transaction;
+
+export const Transaction = mongoose.model<ITransaction>("Transaction", TransactionSchema);

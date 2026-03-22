@@ -18,6 +18,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface Props {
   data: { date: string; value: number }[];
+  costBasis?: number;
 }
 
 /** Simple seeded pseudo-random for deterministic noise */
@@ -29,9 +30,9 @@ function seededRandom(seed: number) {
   };
 }
 
-export function EquityCurve({ data }: Props) {
-  const isPositive =
-    data.length >= 2 && data[data.length - 1].value >= data[0].value;
+export function EquityCurve({ data, costBasis = 0 }: Props) {
+  const lastValue = data[data.length - 1]?.value ?? 0;
+  const isPositive = costBasis > 0 ? lastValue >= costBasis : (data.length >= 2 && lastValue >= data[0].value);
   const color = isPositive ? "#22c55e" : "#ef4444";
 
   const { combined, todayDate } = useMemo(() => {
@@ -159,6 +160,22 @@ export function EquityCurve({ data }: Props) {
                   return labels[value] ?? value;
                 }}
               />
+
+              {/* Cost basis reference line */}
+              {costBasis > 0 && (
+                <ReferenceLine
+                  y={costBasis}
+                  stroke="#94a3b8"
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Deposited ${formatCurrency(costBasis)}`,
+                    position: "insideTopRight",
+                    fill: "#94a3b8",
+                    fontSize: 11,
+                  }}
+                />
+              )}
 
               {/* Vertical divider at "today" */}
               {todayDate && (

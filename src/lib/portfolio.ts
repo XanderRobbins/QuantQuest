@@ -9,6 +9,9 @@ export interface PortfolioState {
   username: string;
   holdings: Holding[];
   history: { date: string; value: number }[];
+  totalDeposited?: number;
+  baselineDeposited?: number;
+  dailyBaseline?: Record<string, number> | null;
 }
 
 const STORAGE_KEY = "quantquest_portfolio";
@@ -173,6 +176,9 @@ function normalizePortfolio(data: Record<string, unknown>): PortfolioState {
     username: (data.username as string) ?? "",
     holdings: (data.holdings as Holding[]) ?? [],
     history: (data.history as { date: string; value: number }[]) ?? [],
+    totalDeposited: (data.totalDeposited as number) ?? 0,
+    baselineDeposited: (data.baselineDeposited as number) ?? 0,
+    dailyBaseline: (data.dailyBaseline as Record<string, number> | null) ?? null,
   };
 }
 

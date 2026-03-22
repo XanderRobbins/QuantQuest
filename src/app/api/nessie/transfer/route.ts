@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
     } else {
       portfolio.holdings.push({ id: "cash", type: "safety", amount });
     }
+    portfolio.totalDeposited = Math.round(((portfolio.totalDeposited ?? 0) + amount) * 100) / 100;
   } else {
     // Portfolio → Bank: remove from portfolio cash, deposit to Nessie
     const portfolioCash = cashHolding?.amount ?? 0;
@@ -89,27 +90,12 @@ export async function POST(req: NextRequest) {
 
     // Remove from portfolio cash
     cashHolding.amount = Math.round((cashHolding.amount - amount) * 100) / 100;
-  }
-
-  // Update portfolio history
-  const totalValue = Math.round(
-    portfolio.holdings.reduce(
-      (sum: number, h: { amount: number }) => sum + h.amount,
-      0
-    ) * 100
-  ) / 100;
-
-  const today = new Date().toISOString().split("T")[0];
-  const lastEntry = portfolio.history[portfolio.history.length - 1];
-  if (lastEntry && lastEntry.date === today) {
-    lastEntry.value = totalValue;
-  } else {
-    portfolio.history.push({ date: today, value: totalValue });
+    portfolio.totalDeposited = Math.round((Math.max(0, (portfolio.totalDeposited ?? 0) - amount)) * 100) / 100;
   }
 
   // Persist both
   portfolio.markModified("holdings");
-  portfolio.markModified("history");
+  portfolio.markModified("totalDeposited");
   await Promise.all([portfolio.save(), nessieAccount.save()]);
 
   return NextResponse.json({
@@ -118,6 +104,9 @@ export async function POST(req: NextRequest) {
       username: portfolio.username,
       holdings: portfolio.holdings,
       history: portfolio.history,
+      totalDeposited: portfolio.totalDeposited ?? 0,
+      baselineDeposited: portfolio.baselineDeposited ?? 0,
+      dailyBaseline: portfolio.dailyBaseline ?? null,
     },
     bankBalance: nessieAccount.balance,
   });

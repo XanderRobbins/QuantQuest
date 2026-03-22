@@ -9,6 +9,7 @@ interface Props {
   dailyChangePercent: number;
   totalReturn: number;
   totalReturnPercent: number;
+  totalDeposited?: number;
 }
 
 export function PortfolioMetrics({
@@ -17,6 +18,7 @@ export function PortfolioMetrics({
   dailyChangePercent,
   totalReturn,
   totalReturnPercent,
+  totalDeposited = 0,
 }: Props) {
   const isUp = (v: number) => v >= 0;
 
@@ -31,7 +33,9 @@ export function PortfolioMetrics({
           </div>
         </div>
         <p className="text-2xl font-black text-foreground">{formatCurrency(totalValue)}</p>
-        <p className="text-xs text-muted-foreground">Total invested capital</p>
+        <p className="text-xs text-muted-foreground">
+          Total Invested Capital: <span className="font-semibold text-foreground">{formatCurrency(totalDeposited)}</span>
+        </p>
       </div>
 
       {/* Daily Change */}
@@ -53,7 +57,7 @@ export function PortfolioMetrics({
           {isUp(dailyChange) ? "+" : "-"}{formatCurrency(Math.abs(dailyChange))}
         </p>
         <p className={`text-xs font-semibold ${isUp(dailyChange) ? "text-success/80" : "text-destructive/80"}`}>
-          {isUp(dailyChange) ? "+" : ""}{formatPercent(dailyChangePercent)} today
+          {formatPercent(dailyChangePercent)} today
         </p>
       </div>
 
@@ -76,7 +80,7 @@ export function PortfolioMetrics({
           {isUp(totalReturn) ? "+" : "-"}{formatCurrency(Math.abs(totalReturn))}
         </p>
         <p className={`text-xs font-semibold ${isUp(totalReturn) ? "text-success/80" : "text-destructive/80"}`}>
-          {isUp(totalReturn) ? "+" : ""}{formatPercent(totalReturnPercent)} total
+          {formatPercent(totalReturnPercent)} total
         </p>
       </div>
     </div>

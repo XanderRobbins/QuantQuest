@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { Portfolio } from "@/models/Portfolio";
 import { User } from "@/models/User";
 import { simulateReturns } from "@/lib/returns";
+import { getLiveDailyChange } from "@/lib/market-data";
 
 // GET /api/portfolio?userId=xxx
 export async function GET(req: NextRequest) {
@@ -18,30 +19,81 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Portfolio not found" }, { status: 404 });
   }
 
-  // Simulate one day of returns if we haven't already today
   const today = new Date().toISOString().split("T")[0];
   const lastEntry = portfolio.history[portfolio.history.length - 1];
 
+  // Once per calendar day: run overnight returns and snapshot the day-open baseline
   if (!lastEntry || lastEntry.date !== today) {
-    // Apply returns to holdings (uses live market data when available)
+    // Apply overnight/daily returns to holdings
     await simulateReturns(portfolio.holdings);
 
-    // Compute new total portfolio value
+    // Snapshot these post-overnight values as the day-open baseline for intraday calc
+    const baseline: Record<string, number> = {};
+    for (const h of portfolio.holdings) {
+      baseline[h.id] = h.amount;
+    }
+    portfolio.dailyBaseline = baseline;
+    portfolio.baselineDate = today;
+    portfolio.baselineDeposited = portfolio.totalDeposited ?? 0;
+
     const totalValue =
       Math.round(
         portfolio.holdings.reduce((sum: number, h: { amount: number }) => sum + h.amount, 0) * 100
       ) / 100;
 
-    // Append today's history entry
     portfolio.history.push({ date: today, value: totalValue });
-
-    // Persist changes
     portfolio.markModified("holdings");
     portfolio.markModified("history");
+    portfolio.markModified("dailyBaseline");
     await portfolio.save();
   }
 
-  return NextResponse.json(portfolio);
+  // Build live-adjusted holdings for the response (not saved to DB)
+  // For sector holdings: displayAmount = dayOpenBaseline * (1 + current live daily change %)
+  // This is accurate and non-compounding regardless of how often the page is refreshed.
+  const baseline =
+    portfolio.baselineDate === today && portfolio.dailyBaseline
+      ? (portfolio.dailyBaseline as Record<string, number>)
+      : null;
+
+  const liveHoldingsPromises = portfolio.holdings.map(async (h: { id: string; type: string; amount: number }) => {
+    if (baseline && h.type === "sector" && baseline[h.id] !== undefined) {
+      try {
+        const liveChange = await getLiveDailyChange(h.id);
+        if (liveChange !== null) {
+          return {
+            id: h.id,
+            type: h.type,
+            amount: Math.round(baseline[h.id] * (1 + liveChange) * 100) / 100,
+          };
+        }
+      } catch {
+        // fall through to stored value
+      }
+    }
+    return { id: h.id, type: h.type, amount: h.amount };
+  });
+
+  const liveHoldings = await Promise.all(liveHoldingsPromises);
+
+  const portfolioObj = portfolio.toObject();
+  portfolioObj.holdings = liveHoldings;
+
+  // Update the most recent history entry with the live total for chart accuracy
+  const liveTotal =
+    Math.round(liveHoldings.reduce((s, h) => s + h.amount, 0) * 100) / 100;
+  if (portfolioObj.history.length > 0) {
+    portfolioObj.history[portfolioObj.history.length - 1].value = liveTotal;
+  }
+
+  // Migration: seed totalDeposited from current value for accounts that predate the field
+  if (!portfolioObj.totalDeposited && liveTotal > 0) {
+    portfolioObj.totalDeposited = liveTotal;
+    portfolio.totalDeposited = liveTotal;
+    await portfolio.save();
+  }
+
+  return NextResponse.json(portfolioObj);
 }
 
 // POST /api/portfolio — create or reset portfolio

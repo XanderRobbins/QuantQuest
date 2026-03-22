@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Zap } from "lucide-react";
+import { ExternalLink, Zap, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { getUserId } from "@/lib/portfolio";
 
 interface TxRecord {
+  _id: string;
   investment: string;
   type: string;
   amount: number;
@@ -20,20 +21,28 @@ export function TransactionHistory() {
   const [txs, setTxs] = useState<TxRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  async function fetchTxs() {
     const userId = getUserId();
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    fetch(`/api/transactions?userId=${userId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setTxs(data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    if (!userId) { setLoading(false); return; }
+    try {
+      const r = await fetch(`/api/transactions?userId=${userId}`);
+      const data = await r.json();
+      if (Array.isArray(data)) setTxs(data);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchTxs();
   }, []);
+
+  // Poll every 4 seconds while any transaction is still pending
+  useEffect(() => {
+    const hasPending = txs.some((tx) => tx.signature === "pending");
+    if (!hasPending) return;
+    const interval = setInterval(fetchTxs, 4000);
+    return () => clearInterval(interval);
+  }, [txs]);
 
   return (
     <Card>
@@ -57,7 +66,7 @@ export function TransactionHistory() {
           <div className="space-y-2">
             {txs.map((tx) => (
               <div
-                key={tx.signature}
+                key={tx._id ?? tx.signature}
                 className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -69,19 +78,26 @@ export function TransactionHistory() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="font-semibold text-success">
-                    {formatCurrency(tx.amount)}
+                  <span className={`font-semibold ${tx.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    {tx.amount >= 0 ? "+" : ""}{formatCurrency(Math.abs(tx.amount))}
                   </span>
-                  <a
-                    href={tx.explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-[#9945FF] hover:underline"
-                    title={tx.signature}
-                  >
-                    {tx.signature.slice(0, 8)}…
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  {tx.signature && tx.signature !== "pending" ? (
+                    <a
+                      href={tx.explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[#9945FF] hover:underline"
+                      title={tx.signature}
+                    >
+                      {tx.signature.slice(0, 8)}…
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground italic">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      confirming
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

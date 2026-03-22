@@ -51,44 +51,53 @@ function updateHistory(portfolio: {
   }
 }
 
-// Shared helper to record trade on Solana and persist transaction
+// Shared helper to record trade — always persists to MongoDB, fires Solana in background
 async function recordTrade(userId: string, targetId: string, targetType: string, amount: number, action: "buy" | "sell") {
-  let solanaSignature: string | null = null;
-  let explorerUrl: string | null = null;
-  let solanaError: string | null = null;
+  const timestamp = new Date();
 
+  // Always save to MongoDB first so the transaction is never lost
+  let txId: string | null = null;
   try {
-    const timestamp = new Date().toISOString();
-    solanaSignature = await recordTradeOnChain({
+    const { connectDB } = await import("@/lib/mongodb");
+    const { Transaction } = await import("@/models/Transaction");
+    await connectDB();
+    const tx = await Transaction.create({
+      userId,
+      investment: targetId,
+      type: targetType,
+      amount: action === "sell" ? -amount : amount,
+      signature: "pending",
+      explorerUrl: "",
+      timestamp,
+    });
+    txId = tx._id.toString();
+  } catch (err) {
+    console.error("[invest] Failed to save transaction to MongoDB:", err);
+  }
+
+  // Try Solana in background; update the record with the real signature when done
+  try {
+    const sig = await recordTradeOnChain({
       userId,
       investment: `${action}:${targetId}`,
       type: targetType,
       amount,
-      timestamp,
+      timestamp: timestamp.toISOString(),
     });
-    explorerUrl = getExplorerUrl(solanaSignature);
-
-    try {
-      const { connectDB } = await import("@/lib/mongodb");
-      const { Transaction } = await import("@/models/Transaction");
-      await connectDB();
-      await Transaction.create({
-        userId,
-        investment: targetId,
-        type: targetType,
-        amount: action === "sell" ? -amount : amount,
-        signature: solanaSignature,
-        explorerUrl,
-        timestamp: new Date(),
-      });
-    } catch {
-      // MongoDB not available — transaction recorded on-chain regardless
+    const explorerUrl = getExplorerUrl(sig);
+    if (txId) {
+      try {
+        const { connectDB } = await import("@/lib/mongodb");
+        const { Transaction } = await import("@/models/Transaction");
+        await connectDB();
+        await Transaction.findByIdAndUpdate(txId, { signature: sig, explorerUrl });
+      } catch { /* non-fatal */ }
     }
+    return { solanaSignature: sig, explorerUrl, solanaError: null };
   } catch (err) {
-    solanaError = err instanceof Error ? err.message : "Solana transaction failed";
+    const solanaError = err instanceof Error ? err.message : "Solana transaction failed";
+    return { solanaSignature: null, explorerUrl: null, solanaError };
   }
-
-  return { solanaSignature, explorerUrl, solanaError };
 }
 
 // POST /api/invest — execute a buy
