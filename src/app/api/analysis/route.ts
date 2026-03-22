@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { safeJson } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   if (!process.env.GEMINI_API_KEY) {
@@ -10,7 +11,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const { generateAnalysis } = await import("@/lib/gemini");
-    const body = await req.json();
+    const body = await safeJson(req);
+    if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     const { totalValue, allocation, holdings } = body;
 
     const analysis = await generateAnalysis({

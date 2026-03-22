@@ -3,9 +3,9 @@ import { sectors } from "@/data/sectors";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
-// Cache market data for 15 minutes to avoid hammering Yahoo Finance
+// Cache market data for 1 minute
 let cache: { data: MarketData; timestamp: number } | null = null;
-const CACHE_TTL = 15 * 60 * 1000;
+const CACHE_TTL = 60 * 1000;
 
 export interface StockQuote {
   symbol: string;

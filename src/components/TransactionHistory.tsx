@@ -3,9 +3,31 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Zap, Loader2 } from "lucide-react";
+import { ExternalLink, Zap, Loader2, ShieldCheck } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { getUserId } from "@/lib/portfolio";
+
+export function useSolanaStats() {
+  const [stats, setStats] = useState<{ count: number; latestUrl: string | null }>({ count: 0, latestUrl: null });
+
+  useEffect(() => {
+    const userId = getUserId();
+    if (!userId) return;
+    fetch(`/api/transactions?userId=${userId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const verified = data.filter((tx: { signature: string }) => tx.signature && tx.signature !== "pending");
+        setStats({
+          count: verified.length,
+          latestUrl: verified[0]?.explorerUrl ?? null,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  return stats;
+}
 
 interface TxRecord {
   _id: string;
@@ -67,38 +89,43 @@ export function TransactionHistory() {
             {txs.map((tx) => (
               <div
                 key={tx._id ?? tx.signature}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+                className="rounded-lg border border-border overflow-hidden"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-2 w-2 rounded-full bg-[#9945FF] shrink-0" />
-                  <div className="min-w-0">
-                    <span className="font-medium capitalize">{tx.investment}</span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="text-muted-foreground capitalize">{tx.type}</span>
+                <div className="flex items-center justify-between px-3 py-2.5 text-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-2 w-2 rounded-full bg-[#9945FF] shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-medium capitalize">{tx.investment}</span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className="text-muted-foreground capitalize">{tx.type}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className={`font-semibold ${tx.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  <span className={`font-semibold shrink-0 ${tx.amount >= 0 ? "text-green-500" : "text-red-500"}`}>
                     {tx.amount >= 0 ? "+" : ""}{formatCurrency(Math.abs(tx.amount))}
                   </span>
-                  {tx.signature && tx.signature !== "pending" ? (
-                    <a
-                      href={tx.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[#9945FF] hover:underline"
-                      title={tx.signature}
-                    >
-                      {tx.signature.slice(0, 8)}…
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground italic">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      confirming
-                    </span>
-                  )}
                 </div>
+                {tx.signature && tx.signature !== "pending" ? (
+                  <a
+                    href={tx.explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-2 px-3 py-2 bg-[#9945FF]/5 border-t border-[#9945FF]/15 text-xs hover:bg-[#9945FF]/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 text-[#9945FF]">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span className="font-medium">Verify on Chain</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="font-mono">{tx.signature.slice(0, 8)}…{tx.signature.slice(-4)}</span>
+                      <ExternalLink className="h-3 w-3 text-[#9945FF]" />
+                    </div>
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="italic">Confirming on Solana...</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

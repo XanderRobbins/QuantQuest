@@ -40,6 +40,7 @@ interface CompetitionRecord {
   type: "historical" | "live";
   scenario: string | null;
   name: string;
+  description: string;
   timeframe: string;
   inviteCode: string | null;
   isGlobal: boolean;
@@ -74,7 +75,7 @@ const rankIcon = (rank: number) => {
 export default function CompetitionPage() {
   const router = useRouter();
   const [portfolio, setPortfolio] = useState<PortfolioState | null>(null);
-  const [mode, setMode] = useState<null | "historical" | "live">(null);
+  const [mode, setMode] = useState<null | "historical" | "live" | "ranked">(null);
 
   // Historical state
   const [activeScenario, setActiveScenario] = useState<HistoricalScenario | null>(null);
@@ -89,6 +90,10 @@ export default function CompetitionPage() {
   const [liveCreatedCode, setLiveCreatedCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [joinResult, setJoinResult] = useState<string | null>(null);
+
+  // Ranked
+  const [rankedComps, setRankedComps] = useState<CompetitionRecord[]>([]);
+  const [joiningRanked, setJoiningRanked] = useState<string | null>(null);
 
   // Shared
   const [copiedCode, setCopiedCode] = useState(false);
@@ -115,6 +120,32 @@ export default function CompetitionPage() {
   };
 
   useEffect(() => { refreshComps(); }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch ranked/global competitions
+  const refreshRanked = () => {
+    fetch("/api/competitions?global=true&status=active")
+      .then((r) => r.json())
+      .then((data) => setRankedComps(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+  useEffect(() => { refreshRanked(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleJoinRanked(compId: string, inviteCode: string) {
+    setJoiningRanked(compId);
+    try {
+      const res = await fetch("/api/competitions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "join", userId, username, inviteCode }),
+      });
+      if (res.ok) {
+        refreshComps();
+        refreshRanked();
+        router.push(`/competition/${compId}`);
+      }
+    } catch { /* */ }
+    finally { setJoiningRanked(null); }
+  }
 
   // ─── Create historical competition ───────────────────────────────────────
 
@@ -237,7 +268,34 @@ export default function CompetitionPage() {
 
       {/* ═══════════════════ MODE SELECTOR ═══════════════════ */}
       {!mode && (
-        <div className="grid gap-6 sm:grid-cols-2 max-w-3xl mx-auto pt-8">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto pt-8">
+          {/* Ranked */}
+          <button
+            onClick={() => setMode("ranked")}
+            className="group relative overflow-hidden rounded-2xl border-2 border-border bg-card p-8 text-left transition-all duration-200 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-yellow-500 to-orange-500" />
+            <div className="space-y-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-500/10 ring-1 ring-yellow-500/20">
+                <Crown className="h-7 w-7 text-yellow-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Ranked</h2>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                  Join the official weekly challenge and compete against the entire community.
+                  Everyone starts with $10,000 — prove your skills.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Open to all</span>
+                <span>·</span>
+                <span>Weekly reset</span>
+              </div>
+            </div>
+            <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+          </button>
+
+          {/* Historical */}
           <button
             onClick={() => setMode("historical")}
             className="group relative overflow-hidden rounded-2xl border-2 border-border bg-card p-8 text-left transition-all duration-200 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
@@ -263,6 +321,7 @@ export default function CompetitionPage() {
             <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/30 group-hover:text-primary transition-colors" />
           </button>
 
+          {/* Live */}
           <button
             onClick={() => setMode("live")}
             className="group relative overflow-hidden rounded-2xl border-2 border-border bg-card p-8 text-left transition-all duration-200 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
@@ -287,6 +346,39 @@ export default function CompetitionPage() {
             </div>
             <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/30 group-hover:text-primary transition-colors" />
           </button>
+
+          {/* Join */}
+          <div className="relative overflow-hidden rounded-2xl border-2 border-border bg-card p-8 text-left transition-all duration-200 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
+            <div className="space-y-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20">
+                <UserPlus className="h-7 w-7 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Join</h2>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                  Got an invite code? Enter it below to jump into your friends&apos; competition.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <input type="text" value={joinCode}
+                  onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinResult(null); }}
+                  placeholder="INVITE CODE" maxLength={6}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono tracking-widest uppercase focus:outline-none focus:ring-1 focus:ring-primary" />
+                <button onClick={handleJoin} disabled={joinCode.length < 3}
+                  className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50">
+                  Join →
+                </button>
+              </div>
+              {joinResult && (
+                <div className={`rounded-lg border p-3 text-sm ${
+                  joinResult.includes("success") || joinResult.includes("Already")
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600"
+                    : "border-red-500/30 bg-red-500/5 text-red-600"
+                }`}>{joinResult}</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -449,87 +541,176 @@ export default function CompetitionPage() {
             Back
           </button>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Create */}
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <Swords className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-lg">Create a Competition</h3>
+          <Card className="max-w-lg">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Swords className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold text-lg">Create a Live Competition</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Start a live competition with real market data. Everyone starts with $10,000.
+              </p>
+              <div className="space-y-3">
+                <input type="text" value={liveName} onChange={(e) => setLiveName(e.target.value)} placeholder="Competition name..."
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground font-medium">Duration</label>
+                  <div className="flex gap-2">
+                    {(["1w", "1m", "3m"] as const).map((tf) => (
+                      <button key={tf} onClick={() => setLiveTimeframe(tf)}
+                        className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+                          liveTimeframe === tf ? "bg-primary text-primary-foreground" : "bg-accent/60 text-muted-foreground hover:bg-accent"
+                        }`}>
+                        {timeframeLabels[tf]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Start a live competition with real market data. Everyone starts with $10,000.
-                </p>
-                <div className="space-y-3">
-                  <input type="text" value={liveName} onChange={(e) => setLiveName(e.target.value)} placeholder="Competition name..."
-                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground font-medium">Duration</label>
-                    <div className="flex gap-2">
-                      {(["1w", "1m", "3m"] as const).map((tf) => (
-                        <button key={tf} onClick={() => setLiveTimeframe(tf)}
-                          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-                            liveTimeframe === tf ? "bg-primary text-primary-foreground" : "bg-accent/60 text-muted-foreground hover:bg-accent"
-                          }`}>
-                          {timeframeLabels[tf]}
-                        </button>
-                      ))}
+                <button onClick={handleCreateLive} disabled={!liveName.trim()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50">
+                  <Plus className="h-4 w-4" />
+                  Create Competition
+                </button>
+                {liveCreatedCode && (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm font-medium text-emerald-600">Created!</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Code:</span>
+                      <code className="rounded-md bg-card px-3 py-1 text-lg font-bold font-mono tracking-widest">{liveCreatedCode}</code>
+                      <button onClick={() => copyCode(liveCreatedCode)} className="rounded-md p-1.5 hover:bg-accent transition-colors">
+                        {copiedCode ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
-                  <button onClick={handleCreateLive} disabled={!liveName.trim()}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50">
-                    <Plus className="h-4 w-4" />
-                    Create Competition
-                  </button>
-                  {liveCreatedCode && (
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-600">Created!</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Code:</span>
-                        <code className="rounded-md bg-card px-3 py-1 text-lg font-bold font-mono tracking-widest">{liveCreatedCode}</code>
-                        <button onClick={() => copyCode(liveCreatedCode)} className="rounded-md p-1.5 hover:bg-accent transition-colors">
-                          {copiedCode ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Join */}
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold text-lg">Join a Competition</h3>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Got an invite code? Enter it to join your friends&apos; competition.
-                </p>
-                <div className="flex gap-2">
-                  <input type="text" value={joinCode}
-                    onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinResult(null); }}
-                    placeholder="INVITE CODE" maxLength={6}
-                    className="flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm font-mono tracking-widest uppercase focus:outline-none focus:ring-1 focus:ring-primary" />
-                  <button onClick={handleJoin} disabled={joinCode.length < 3}
-                    className="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50">
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-                {joinResult && (
-                  <div className={`rounded-lg border p-3 text-sm ${
-                    joinResult.includes("success") || joinResult.includes("Already")
-                      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600"
-                      : "border-red-500/30 bg-red-500/5 text-red-600"
-                  }`}>{joinResult}</div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ═══════════════════ RANKED MODE ═══════════════════ */}
+      {mode === "ranked" && (
+        <div className="space-y-6">
+          <button onClick={() => setMode(null)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-yellow-500" />
+              <h2 className="text-lg font-semibold">Ranked Competitions</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Open competitions anyone can join. Compete against the entire QuantQuest community.
+            </p>
+          </div>
+
+          {rankedComps.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 space-y-2">
+                <Crown className="h-10 w-10 text-muted-foreground/20" />
+                <p className="text-sm text-muted-foreground">No active ranked competitions right now.</p>
               </CardContent>
             </Card>
-          </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {rankedComps.map((comp) => {
+                const alreadyIn = comp.participants.some((p) => p.userId === userId);
+                const progressPct = comp.totalDays > 0 ? Math.round((comp.currentDay / comp.totalDays) * 100) : 0;
+
+                return (
+                  <Card key={comp._id} className="overflow-hidden border-yellow-500/20">
+                    <div className="h-1.5 bg-gradient-to-r from-yellow-500 to-orange-500" />
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Crown className="h-4 w-4 text-yellow-500" />
+                            <h3 className="font-bold text-lg">{comp.name}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{comp.description}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30 shrink-0">
+                          {timeframeLabels[comp.timeframe as Timeframe]}
+                        </Badge>
+                      </div>
+
+                      {/* Progress */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Day {comp.currentDay} / {comp.totalDays}</span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {comp.participants.length} player{comp.participants.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-accent/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all" style={{ width: `${progressPct}%` }} />
+                        </div>
+                      </div>
+
+                      {/* Top 3 preview */}
+                      {comp.participants.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">Leaderboard</p>
+                          {[...comp.participants]
+                            .sort((a, b) => {
+                              const aVal = a.cash + (a.holdings ?? []).reduce((s, h) => s + h.amount, 0);
+                              const bVal = b.cash + (b.holdings ?? []).reduce((s, h) => s + h.amount, 0);
+                              return bVal - aVal;
+                            })
+                            .slice(0, 5)
+                            .map((p, i) => {
+                              const val = p.cash + (p.holdings ?? []).reduce((s, h) => s + h.amount, 0);
+                              const ret = ((val - 10000) / 10000) * 100;
+                              return (
+                                <div key={p.userId} className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-2">
+                                    {rankIcon(i + 1)}
+                                    <span className="font-medium">{p.username}</span>
+                                  </div>
+                                  <span className={`font-semibold ${ret >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                    {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {alreadyIn ? (
+                        <Link
+                          href={`/competition/${comp._id}`}
+                          className="flex items-center justify-center gap-2 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+                        >
+                          <Play className="h-4 w-4" />
+                          Enter Competition
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => handleJoinRanked(comp._id, comp.inviteCode ?? "")}
+                          disabled={joiningRanked === comp._id}
+                          className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                        >
+                          {joiningRanked === comp._id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          ) : (
+                            <Swords className="h-4 w-4" />
+                          )}
+                          Join Competition
+                        </button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

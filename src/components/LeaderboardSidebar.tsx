@@ -40,20 +40,27 @@ export function LeaderboardSidebar({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    fetch("/api/leaderboard")
-      .then((r) => r.json())
-      .then((data: LeaderboardEntry[]) => setEntries(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
 
-    const userId = getUserId();
-    if (userId) {
-      fetch(`/api/gamification?userId=${userId}`)
+    function fetchData() {
+      setLoading(true);
+      fetch("/api/leaderboard")
         .then((r) => r.json())
-        .then((data: GameProfileData) => setProfile(data))
-        .catch(() => {});
+        .then((data: LeaderboardEntry[]) => setEntries(data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+
+      const userId = getUserId();
+      if (userId) {
+        fetch(`/api/gamification?userId=${userId}`)
+          .then((r) => r.json())
+          .then((data: GameProfileData) => setProfile(data))
+          .catch(() => {});
+      }
     }
+
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
   }, [open]);
 
   const sorted = [...entries].sort((a, b) =>

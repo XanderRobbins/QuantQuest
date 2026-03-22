@@ -8,7 +8,7 @@ import { EquityCurve } from "@/components/EquityCurve";
 import { AllocationPieChart } from "@/components/AllocationPieChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowDownToLine, TrendingUp, Trophy, Activity } from "lucide-react";
+import { ArrowDownToLine, TrendingUp, Trophy, Activity, ShieldCheck, ExternalLink } from "lucide-react";
 import { AchievementToast } from "@/components/AchievementToast";
 import { getUserId } from "@/lib/portfolio";
 import Link from "next/link";
@@ -17,7 +17,7 @@ import { sectors } from "@/data/sectors";
 import { strategies } from "@/data/strategies";
 import { safeties } from "@/data/safeties";
 import { formatCurrency } from "@/lib/utils";
-import { TransactionHistory } from "@/components/TransactionHistory";
+import { TransactionHistory, useSolanaStats } from "@/components/TransactionHistory";
 import { NessieBalance } from "@/components/NessieBalance";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const solanaStats = useSolanaStats();
 
   useEffect(() => {
     async function load() {
@@ -39,11 +40,11 @@ export default function DashboardPage() {
     }
     load();
 
-    // Silently refresh portfolio every 30 seconds
+    // Silently refresh portfolio every 60 seconds
     const interval = setInterval(async () => {
       const p = await apiFetchPortfolio();
       if (p) setPortfolio(p);
-    }, 30000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [router]);
@@ -185,6 +186,35 @@ export default function DashboardPage() {
         totalReturnPercent={totalReturnPercent}
         totalDeposited={costBasis}
       />
+
+      {/* Solana Verification Badge */}
+      {solanaStats.count > 0 && (
+        <a
+          href={solanaStats.latestUrl ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between rounded-xl border border-[#9945FF]/20 bg-gradient-to-r from-[#9945FF]/5 to-[#14F195]/5 px-5 py-3 hover:border-[#9945FF]/40 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#9945FF]/15">
+              <ShieldCheck className="h-5 w-5 text-[#9945FF]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-[#9945FF]">{solanaStats.count} trade{solanaStats.count !== 1 ? "s" : ""} verified on Solana</span>
+                <Badge variant="outline" className="text-[10px] border-[#14F195]/40 text-[#14F195] bg-[#14F195]/5 px-1.5 py-0">
+                  Devnet
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Every trade is recorded as an immutable memo transaction on the Solana blockchain</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-[#9945FF] opacity-0 group-hover:opacity-100 transition-opacity">
+            <span>View on Explorer</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </div>
+        </a>
+      )}
 
       {/* Charts */}
       <div className="grid gap-5 lg:grid-cols-2">

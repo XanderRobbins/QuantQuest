@@ -92,11 +92,16 @@ export default function InvestPage() {
     }
     load();
 
-    // Fetch live market data (non-blocking)
-    fetch("/api/market-data")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setMarketData(d); })
-      .catch(() => {});
+    // Fetch live market data every 60s
+    function fetchMarket() {
+      fetch("/api/market-data")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d) setMarketData(d); })
+        .catch(() => {});
+    }
+    fetchMarket();
+    const marketInterval = setInterval(fetchMarket, 60000);
+    return () => clearInterval(marketInterval);
   }, [router]);
 
   // Auto-dismiss toasts after 8 seconds

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createWithdrawal } from "@/lib/nessie";
+import { safeJson } from "@/lib/utils";
 
 // POST /api/nessie/deposit — record an investment as a Nessie withdrawal (funds leaving account to invest)
 export async function POST(req: NextRequest) {
-  const { accountId, amount, description } = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const { accountId, amount, description } = body;
 
   if (!accountId || !amount) {
     return NextResponse.json({ error: "accountId and amount required" }, { status: 400 });

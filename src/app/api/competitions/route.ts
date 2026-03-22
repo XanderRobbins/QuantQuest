@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Competition } from "@/models/Competition";
 import { scenarios, COMP_DAYS, type Timeframe } from "@/data/scenarios";
+import { safeJson } from "@/lib/utils";
 
 // GET /api/competitions?userId=xxx&status=active
 export async function GET(req: NextRequest) {
@@ -11,10 +12,16 @@ export async function GET(req: NextRequest) {
 
   await connectDB();
 
+  const global = sp.get("global");
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = {};
   if (status) filter.status = status;
-  if (userId) filter["participants.userId"] = userId;
+  if (global === "true") {
+    filter.isGlobal = true;
+  } else if (userId) {
+    filter["participants.userId"] = userId;
+  }
 
   const competitions = await Competition.find(filter)
     .sort({ createdAt: -1 })
@@ -26,7 +33,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/competitions
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { action, userId, username } = body;
 
   if (!userId || !username) {

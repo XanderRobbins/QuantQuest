@@ -78,7 +78,7 @@ export default function AdvancedPage() {
       const res = await fetch("/api/advanced", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ history: p.history }),
+        body: JSON.stringify({ history: p.history, totalDeposited: p.totalDeposited }),
       });
       if (!res.ok) throw new Error("Failed to compute metrics");
       const data: AdvancedMetrics = await res.json();

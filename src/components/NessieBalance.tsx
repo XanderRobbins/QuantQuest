@@ -210,13 +210,30 @@ export function NessieBalance({ portfolio, onPortfolioUpdate }: Props) {
             {loading ? (
               <div className="h-8 w-32 rounded bg-muted animate-pulse" />
             ) : data ? (
-              <div>
-                <span className="text-2xl font-bold text-[#D03027]">
-                  {formatCurrency(data.balance)}
-                </span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Account {data.accountId.slice(-8).toUpperCase()} &middot; Checking
-                </p>
+              <div className="flex items-end gap-6">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Bank</p>
+                  <span className="text-2xl font-bold text-[#D03027]">
+                    {formatCurrency(data.balance)}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Account {data.accountId.slice(-8).toUpperCase()} &middot; Checking
+                  </p>
+                </div>
+                <div className="text-muted-foreground text-lg font-light pb-1">+</div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Portfolio</p>
+                  <span className="text-2xl font-bold text-foreground">
+                    {formatCurrency(totalPortfolioValue)}
+                  </span>
+                </div>
+                <div className="text-muted-foreground text-lg font-light pb-1">=</div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Net Worth</p>
+                  <span className="text-2xl font-black text-gradient">
+                    {formatCurrency(data.balance + totalPortfolioValue)}
+                  </span>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Account not found</p>

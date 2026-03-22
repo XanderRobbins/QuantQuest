@@ -228,6 +228,43 @@ export default function LandingPage() {
               ? "Already have an account? Log in"
               : "New here? Create an account"}
           </button>
+
+          <div className="relative flex items-center gap-3 pt-1">
+            <div className="flex-1 border-t border-border/50" />
+            <span className="text-[11px] text-muted-foreground/50 uppercase tracking-wider">or</span>
+            <div className="flex-1 border-t border-border/50" />
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full h-10 text-sm gap-2 border-dashed"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                const res = await fetch("/api/login", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username: "Jordan" }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  setUserId(data.userId);
+                  router.push("/dashboard");
+                } else {
+                  setError("Demo account not available.");
+                  setLoading(false);
+                }
+              } catch {
+                setError("Connection error.");
+                setLoading(false);
+              }
+            }}
+          >
+            <TrendingUp className="h-4 w-4" />
+            Try Demo Account
+          </Button>
         </div>
 
         {/* Feature grid */}

@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, AlertTriangle, Sparkles, Scale, Loader2, TrendingUp } from "lucide-react";
+import { Brain, AlertTriangle, Sparkles, Scale, Loader2, TrendingUp, MessageCircle, Send, X } from "lucide-react";
 import { AchievementToast } from "@/components/AchievementToast";
 import { getUserId } from "@/lib/portfolio";
 import { sectors } from "@/data/sectors";
@@ -106,6 +106,12 @@ export default function AnalysisPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
+  const [chatOpen, setChatOpen] = useState<Perspective | null>(null);
+  const [chatHistories, setChatHistories] = useState<Record<Perspective, { role: "user" | "model"; text: string }[]>>({
+    critic: [], optimist: [], realist: [],
+  });
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -158,6 +164,39 @@ export default function AnalysisPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const sendChat = async () => {
+    if (!chatOpen || !chatInput.trim() || !analysis) return;
+    const message = chatInput.trim();
+    setChatInput("");
+    setChatLoading(true);
+
+    const perspective = chatOpen;
+    const newHistory = [...chatHistories[perspective], { role: "user" as const, text: message }];
+    setChatHistories((prev) => ({ ...prev, [perspective]: newHistory }));
+
+    try {
+      const res = await fetch("/api/analysis/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          perspective,
+          analysisText: analysis[perspective],
+          holdings: holdingNames,
+          history: chatHistories[perspective],
+          message,
+        }),
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setChatHistories((prev) => ({
+          ...prev,
+          [perspective]: [...newHistory, { role: "model" as const, text: data.reply }],
+        }));
+      }
+    } catch { /* */ }
+    finally { setChatLoading(false); }
   };
 
   const perspectives: {
@@ -291,6 +330,8 @@ export default function AnalysisPage() {
         <div className="grid gap-5 lg:grid-cols-3">
           {perspectives.map((p) => {
             const Icon = p.icon;
+            const isChatOpen = chatOpen === p.key;
+            const messages = chatHistories[p.key];
             return (
               <div key={p.key} className={`rounded-xl border ${p.border} bg-gradient-to-b ${p.gradient} overflow-hidden flex flex-col`}>
                 {/* Card header */}
@@ -298,15 +339,94 @@ export default function AnalysisPage() {
                   <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${p.iconBg} flex-shrink-0`}>
                     <Icon className={`h-5 w-5 ${p.iconColor}`} />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className={`font-bold text-base ${p.iconColor}`}>{p.title}</h3>
                     <p className="text-xs text-muted-foreground">{p.subtitle}</p>
                   </div>
+                  {isChatOpen && (
+                    <button onClick={() => setChatOpen(null)} className="rounded-lg p-1.5 hover:bg-accent/50 transition-colors">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
                 {/* Card body */}
                 <div className="p-5 flex-1">
                   <MarkdownText text={analysis[p.key]} baseColor={p.dotColor} />
                 </div>
+
+                {/* Chat panel */}
+                {isChatOpen && (
+                  <div className={`border-t ${p.divider} flex flex-col`}>
+                    {/* Messages */}
+                    <div className="max-h-64 overflow-y-auto p-4 space-y-3">
+                      {messages.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          Ask {p.title} anything about their analysis...
+                        </p>
+                      )}
+                      {messages.map((msg, i) => (
+                        <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                            msg.role === "user"
+                              ? "bg-primary text-primary-foreground"
+                              : `${p.headerBg} border ${p.border}`
+                          }`}>
+                            {msg.role === "model" ? (
+                              <MarkdownText text={msg.text} baseColor={p.dotColor} />
+                            ) : (
+                              msg.text
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {chatLoading && chatOpen === p.key && (
+                        <div className="flex justify-start">
+                          <div className={`rounded-xl px-3 py-2 ${p.headerBg} border ${p.border}`}>
+                            <Loader2 className={`h-4 w-4 animate-spin ${p.iconColor}`} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Input */}
+                    <div className={`border-t ${p.divider} p-3 space-y-2`}>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatOpen === p.key ? chatInput : ""}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChat()}
+                          placeholder={`Ask ${p.title}...`}
+                          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                          disabled={chatLoading}
+                        />
+                        <button
+                          onClick={sendChat}
+                          disabled={chatLoading || !chatInput.trim()}
+                          className={`rounded-lg px-3 py-2 ${p.iconBg} ${p.iconColor} transition-all hover:opacity-80 disabled:opacity-40`}
+                        >
+                          <Send className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground/60">
+                        <Sparkles className="h-3 w-3" />
+                        <span>Powered by Google Gemini</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Discuss button */}
+                {!isChatOpen && (
+                  <div className={`border-t ${p.divider} p-3`}>
+                    <button
+                      onClick={() => { setChatOpen(p.key); setChatInput(""); }}
+                      className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${p.headerBg} ${p.iconColor} hover:opacity-80`}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Discuss with {p.title}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

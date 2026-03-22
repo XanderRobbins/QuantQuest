@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCustomer, createAccount, getAccount } from "@/lib/nessie";
+import { safeJson } from "@/lib/utils";
 
 // In-memory fallback when MongoDB is not configured
 const memStore: Record<string, { customerId: string; accountId: string; balance: number }> = {};
@@ -36,7 +37,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/nessie/account — create customer + account for a new user
 export async function POST(req: NextRequest) {
-  const { userId, username } = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const { userId, username } = body;
   if (!userId || !username) {
     return NextResponse.json({ error: "userId and username required" }, { status: 400 });
   }

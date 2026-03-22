@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordTradeOnChain, getExplorerUrl } from "@/lib/solana";
+import { safeJson } from "@/lib/utils";
 
 // In-memory portfolio store as fallback when MongoDB isn't configured
 const portfolioStore: Record<string, {
@@ -102,7 +103,8 @@ async function recordTrade(userId: string, targetId: string, targetType: string,
 
 // POST /api/invest — execute a buy
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { userId, targetId, targetType, amount } = body;
 
   if (!userId || !targetId || !targetType || !amount || amount <= 0) {
@@ -150,7 +152,8 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/invest — sell a position (partially or fully)
 export async function DELETE(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { userId, targetId, amount } = body;
 
   if (!userId || !targetId || !amount || amount <= 0) {

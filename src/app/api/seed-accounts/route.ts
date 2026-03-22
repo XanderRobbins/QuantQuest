@@ -8,7 +8,7 @@ import { User } from "@/models/User";
 function generateHistory(startDate: Date, startValue: number, profile: "aggressive" | "moderate" | "conservative" | "momentum" | "value") {
   const history: { date: string; value: number }[] = [];
   let value = startValue;
-  const today = new Date("2026-03-21");
+  const today = new Date();
 
   // Monthly drift & vol per profile
   const configs = {
@@ -348,7 +348,7 @@ export async function GET(req: NextRequest) {
   await connectDB();
 
   const force = req.nextUrl.searchParams.get("force") === "true";
-  const now = new Date("2026-03-21");
+  const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
   let created = 0;
   let skipped = 0;

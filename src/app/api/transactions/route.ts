@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordTradeOnChain, getExplorerUrl } from "@/lib/solana";
+import { safeJson } from "@/lib/utils";
 
 // In-memory store as fallback when MongoDB isn't configured
 const memoryStore: {
@@ -14,7 +15,9 @@ const memoryStore: {
 
 // POST /api/transactions — record a trade on Solana devnet
 export async function POST(req: NextRequest) {
-  const { userId, investment, type, amount } = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const { userId, investment, type, amount } = body;
 
   const timestamp = new Date().toISOString();
 

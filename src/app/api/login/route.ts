@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { Portfolio } from "@/models/Portfolio";
+import { safeJson } from "@/lib/utils";
 
 // POST /api/login — find existing account by username
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { username } = body;
 
   if (!username?.trim()) {

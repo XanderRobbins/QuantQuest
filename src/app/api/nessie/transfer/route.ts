@@ -3,11 +3,14 @@ import { connectDB } from "@/lib/mongodb";
 import { Portfolio } from "@/models/Portfolio";
 import { NessieAccount } from "@/models/NessieAccount";
 import { createDeposit, createWithdrawal } from "@/lib/nessie";
+import { safeJson } from "@/lib/utils";
 
 // POST /api/nessie/transfer — move money between bank and portfolio
 // direction: "deposit" = bank → portfolio, "withdraw" = portfolio → bank
 export async function POST(req: NextRequest) {
-  const { userId, accountId, amount, direction } = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const { userId, accountId, amount, direction } = body;
 
   if (!userId || !accountId || !amount || !direction) {
     return NextResponse.json(

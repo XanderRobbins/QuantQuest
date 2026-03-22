@@ -141,9 +141,9 @@ export default function CompetitionDetailPage() {
 
   useEffect(() => { fetchComp(); }, [fetchComp]);
 
-  // Auto-refresh every 15s for live updates
+  // Auto-refresh every 60s for live updates
   useEffect(() => {
-    const interval = setInterval(fetchComp, 15000);
+    const interval = setInterval(fetchComp, 60000);
     return () => clearInterval(interval);
   }, [fetchComp]);
 

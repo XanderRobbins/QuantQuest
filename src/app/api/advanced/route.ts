@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { snowflakeQuery, isSnowflakeConfigured } from "@/lib/snowflake";
+import { safeJson } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export interface AdvancedMetrics {
   computedBy: "snowflake" | "local";
 }
 
-function computeLocally(history: { date: string; value: number }[]): AdvancedMetrics {
+function computeLocally(history: { date: string; value: number }[], totalDeposited?: number): AdvancedMetrics {
   const nonZero = history.filter((h) => h.value > 0);
   if (nonZero.length < 2) {
     return {
@@ -49,8 +50,6 @@ function computeLocally(history: { date: string; value: number }[]): AdvancedMet
   const downsideVariance = negReturns.reduce((s, r) => s + r ** 2, 0) / Math.max(n, 1);
   const downsideStd = Math.sqrt(downsideVariance);
 
-  const bestDay = Math.max(...returns);
-  const worstDay = Math.min(...returns);
   const winRate = returns.filter((r) => r > 0).length / n;
 
   // Max drawdown
@@ -62,10 +61,15 @@ function computeLocally(history: { date: string; value: number }[]): AdvancedMet
     if (dd < maxDD) maxDD = dd;
   }
 
-  const startVal = nonZero[0].value;
   const endVal = nonZero[nonZero.length - 1].value;
-  const totalReturn = (endVal - startVal) / startVal;
+  const costBasis = totalDeposited && totalDeposited > 0 ? totalDeposited : nonZero[0].value;
+  const totalReturn = (endVal - costBasis) / costBasis;
   const annualizedReturn = Math.pow(1 + totalReturn, 252 / n) - 1;
+
+  // Filter out deposit-day spikes: cap daily returns at 20% to exclude artificial jumps from deposits
+  const filteredReturns = returns.filter((r) => Math.abs(r) < 0.2);
+  const bestDay = filteredReturns.length > 0 ? Math.max(...filteredReturns) : Math.max(...returns);
+  const worstDay = filteredReturns.length > 0 ? Math.min(...filteredReturns) : Math.min(...returns);
 
   const RF = 0.05 / 252; // daily risk-free rate ~5% annual
   const sharpeRatio = stdR > 0 ? ((meanR - RF) / stdR) * Math.sqrt(252) : 0;
@@ -91,7 +95,8 @@ function computeLocally(history: { date: string; value: number }[]): AdvancedMet
 }
 
 async function computeViaSnowflake(
-  history: { date: string; value: number }[]
+  history: { date: string; value: number }[],
+  totalDeposited?: number
 ): Promise<AdvancedMetrics> {
   const nonZero = history.filter((h) => h.value > 0);
   if (nonZero.length < 2) throw new Error("Not enough data");
@@ -123,8 +128,8 @@ agg AS (
     COUNT(*) AS n,
     AVG(ret) AS avg_ret,
     STDDEV_POP(ret) AS std_ret,
-    MAX(ret) AS best_day,
-    MIN(ret) AS worst_day,
+    MAX(CASE WHEN ABS(ret) < 0.2 THEN ret ELSE NULL END) AS best_day,
+    MIN(CASE WHEN ABS(ret) < 0.2 THEN ret ELSE NULL END) AS worst_day,
     SUM(CASE WHEN ret > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*) AS win_rate,
     STDDEV_POP(CASE WHEN ret < 0 THEN ret ELSE NULL END) AS downside_std,
     MIN((val - running_peak) / NULLIF(running_peak, 0)) AS max_drawdown
@@ -169,9 +174,9 @@ FROM agg
   const r = rows[0];
 
   const n = r.TRADING_DAYS;
-  const startVal = nonZero[0].value;
   const endVal = nonZero[nonZero.length - 1].value;
-  const totalReturn = (endVal - startVal) / startVal;
+  const costBasis = totalDeposited && totalDeposited > 0 ? totalDeposited : nonZero[0].value;
+  const totalReturn = (endVal - costBasis) / costBasis;
   const annualizedReturn = Math.pow(1 + totalReturn, 252 / n) - 1;
   const maxDD = r.MAX_DRAWDOWN ?? 0;
   const calmarRatio = maxDD < 0 ? annualizedReturn / Math.abs(maxDD) : 0;
@@ -194,18 +199,20 @@ FROM agg
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const history: { date: string; value: number }[] = body.history ?? [];
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const history: { date: string; value: number }[] = (body.history as { date: string; value: number }[]) ?? [];
+  const totalDeposited: number | undefined = body.totalDeposited as number | undefined;
 
   if (isSnowflakeConfigured()) {
     try {
-      const metrics = await computeViaSnowflake(history);
+      const metrics = await computeViaSnowflake(history, totalDeposited);
       return NextResponse.json(metrics);
     } catch (err) {
       console.error("Snowflake error, falling back to local:", err);
     }
   }
 
-  const metrics = computeLocally(history);
+  const metrics = computeLocally(history, totalDeposited);
   return NextResponse.json(metrics);
 }

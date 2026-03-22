@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { XP_REWARDS, getLevel } from "@/lib/xp";
 import { checkAchievements } from "@/lib/achievements";
+import { safeJson } from "@/lib/utils";
 
 // In-memory fallback when MongoDB is unavailable
 const memoryProfiles = new Map<
@@ -72,7 +73,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/gamification
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { userId, action, data } = body;
 
   if (!userId || !action) {

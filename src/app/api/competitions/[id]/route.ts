@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Competition, type ICompetition } from "@/models/Competition";
 import { getDayMultiplier, type Timeframe } from "@/data/scenarios";
+import { safeJson } from "@/lib/utils";
+import { getExpectedDailyReturn } from "@/lib/returns";
+import { sectors } from "@/data/sectors";
+import { strategies } from "@/data/strategies";
+import { safeties } from "@/data/safeties";
 
 // ─── Simulation engine ──────────────────────────────────────────────────────
 
-/** Each simulation "day" is split into 26 intervals of 15 minutes (6.5 trading hours) */
-const INTERVALS_PER_DAY = 26;
-const MS_PER_INTERVAL = 15 * 60 * 1000; // 15 minutes
+/** Each simulation "day" = 1 real calendar day, updated every minute */
+const INTERVALS_PER_DAY = 1440;
+const MS_PER_INTERVAL = 60 * 1000; // 1 minute
 
 function advanceSimulation(competition: ICompetition) {
   if (!competition.startedAt || competition.status === "completed") return;
@@ -53,8 +58,11 @@ function advanceSimulation(competition: ICompetition) {
     const applyDay = simDay + 1;
 
     for (const participant of competition.participants) {
-      if (scenarioId) {
-        for (const holding of participant.holdings) {
+      for (const holding of participant.holdings) {
+        let intervalMult: number;
+
+        if (scenarioId) {
+          // Historical scenario: use pre-defined day multipliers
           const dayMult = getDayMultiplier(
             scenarioId,
             timeframe,
@@ -62,10 +70,18 @@ function advanceSimulation(competition: ICompetition) {
             Math.min(applyDay, competition.totalDays),
             competition.totalDays
           );
-          // Apply 1/26th of the day's return per interval
-          const intervalMult = 1 + (dayMult - 1) / INTERVALS_PER_DAY;
-          holding.amount = Math.round(holding.amount * intervalMult * 100) / 100;
+          intervalMult = 1 + (dayMult - 1) / INTERVALS_PER_DAY;
+        } else {
+          // Live competition: use expected daily returns + noise
+          const dailyReturn = getExpectedDailyReturn(holding.assetId);
+          const noiseScale = safeties.find(s => s.id === holding.assetId) ? 0.0001
+            : strategies.find(s => s.id === holding.assetId) ? 0.005
+            : 0.01;
+          const noise = (Math.random() - 0.5) * noiseScale / Math.sqrt(INTERVALS_PER_DAY);
+          intervalMult = 1 + dailyReturn / INTERVALS_PER_DAY + noise;
         }
+
+        holding.amount = Math.round(holding.amount * intervalMult * 100) / 100;
       }
     }
 
@@ -167,7 +183,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { action, userId } = body;
 
   if (!userId) {

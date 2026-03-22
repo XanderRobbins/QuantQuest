@@ -4,6 +4,7 @@ import { Portfolio } from "@/models/Portfolio";
 import { User } from "@/models/User";
 import { simulateReturns } from "@/lib/returns";
 import { getLiveDailyChange } from "@/lib/market-data";
+import { safeJson } from "@/lib/utils";
 
 // GET /api/portfolio?userId=xxx
 export async function GET(req: NextRequest) {
@@ -22,11 +23,11 @@ export async function GET(req: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
   const now = new Date();
   const lastEntry = portfolio.history[portfolio.history.length - 1];
-  const FIFTEEN_MIN = 15 * 60 * 1000;
+  const ONE_MIN = 60 * 1000;
 
-  // Check if 15 minutes have passed since last simulation
+  // Check if 1 minute has passed since last simulation
   const lastSim = portfolio.lastSimulatedAt ? new Date(portfolio.lastSimulatedAt).getTime() : 0;
-  const shouldSimulate = (now.getTime() - lastSim) >= FIFTEEN_MIN;
+  const shouldSimulate = (now.getTime() - lastSim) >= ONE_MIN;
   const isNewDay = !lastEntry || lastEntry.date !== today;
 
   if (shouldSimulate) {
@@ -122,7 +123,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/portfolio — create or reset portfolio
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await safeJson(req);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const { userId, username } = body;
 
   if (!userId || !username) {

@@ -11,14 +11,14 @@ export async function GET() {
 
   if (tradedUserIds.length === 0) {
     // Fall back to all portfolios if no transactions yet
-    const all = await Portfolio.find({}, { username: 1, history: 1 }).lean();
+    const all = await Portfolio.find({}, { username: 1, history: 1, totalDeposited: 1 }).lean();
     return NextResponse.json(buildEntries(all, {}));
   }
 
   // Fetch portfolios for users who have traded
   const portfolios = await Portfolio.find(
     { userId: { $in: tradedUserIds } },
-    { userId: 1, username: 1, history: 1 }
+    { userId: 1, username: 1, history: 1, totalDeposited: 1 }
   ).lean();
 
   // Count trades per user for display
@@ -33,17 +33,17 @@ export async function GET() {
 }
 
 function buildEntries(
-  portfolios: { userId?: string; username: string; history: { date: string; value: number }[] }[],
+  portfolios: { userId?: string; username: string; history: { date: string; value: number }[]; totalDeposited?: number }[],
   countMap: Record<string, number>
 ) {
   const entries = portfolios.map((p) => {
     const history = p.history ?? [];
     const last = history[history.length - 1]?.value ?? 0;
     const prev = history[history.length - 2]?.value ?? last;
-    const first = history[0]?.value ?? last;
+    const costBasis = p.totalDeposited && p.totalDeposited > 0 ? p.totalDeposited : (history.find((h) => h.value > 0)?.value ?? last);
 
     const dailyChangePercent = prev > 0 ? ((last - prev) / prev) * 100 : 0;
-    const allTimeChangePercent = first > 0 ? ((last - first) / first) * 100 : 0;
+    const allTimeChangePercent = costBasis > 0 ? ((last - costBasis) / costBasis) * 100 : 0;
 
     return {
       username: p.username,
