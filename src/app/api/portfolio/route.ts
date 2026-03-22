@@ -20,31 +20,45 @@ export async function GET(req: NextRequest) {
   }
 
   const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
   const lastEntry = portfolio.history[portfolio.history.length - 1];
+  const FIFTEEN_MIN = 15 * 60 * 1000;
 
-  // Once per calendar day: run overnight returns and snapshot the day-open baseline
-  if (!lastEntry || lastEntry.date !== today) {
-    // Apply overnight/daily returns to holdings
+  // Check if 15 minutes have passed since last simulation
+  const lastSim = portfolio.lastSimulatedAt ? new Date(portfolio.lastSimulatedAt).getTime() : 0;
+  const shouldSimulate = (now.getTime() - lastSim) >= FIFTEEN_MIN;
+  const isNewDay = !lastEntry || lastEntry.date !== today;
+
+  if (shouldSimulate) {
+    // Apply returns to holdings (uses live market data when available)
     await simulateReturns(portfolio.holdings);
+    portfolio.lastSimulatedAt = now;
 
-    // Snapshot these post-overnight values as the day-open baseline for intraday calc
-    const baseline: Record<string, number> = {};
-    for (const h of portfolio.holdings) {
-      baseline[h.id] = h.amount;
+    // On new day: snapshot baseline for intraday calculations
+    if (isNewDay) {
+      const baseline: Record<string, number> = {};
+      for (const h of portfolio.holdings) {
+        baseline[h.id] = h.amount;
+      }
+      portfolio.dailyBaseline = baseline;
+      portfolio.baselineDate = today;
+      portfolio.baselineDeposited = portfolio.totalDeposited ?? 0;
+      portfolio.markModified("dailyBaseline");
     }
-    portfolio.dailyBaseline = baseline;
-    portfolio.baselineDate = today;
-    portfolio.baselineDeposited = portfolio.totalDeposited ?? 0;
 
     const totalValue =
       Math.round(
         portfolio.holdings.reduce((sum: number, h: { amount: number }) => sum + h.amount, 0) * 100
       ) / 100;
 
-    portfolio.history.push({ date: today, value: totalValue });
+    if (isNewDay) {
+      portfolio.history.push({ date: today, value: totalValue });
+    } else if (lastEntry) {
+      lastEntry.value = totalValue;
+    }
+
     portfolio.markModified("holdings");
     portfolio.markModified("history");
-    portfolio.markModified("dailyBaseline");
     await portfolio.save();
   }
 

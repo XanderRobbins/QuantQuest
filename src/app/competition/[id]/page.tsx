@@ -65,6 +65,7 @@ interface CompetitionData {
   timeframe: string;
   startingCash: number;
   currentDay: number;
+  currentInterval: number;
   totalDays: number;
   startedAt: string;
   status: string;
@@ -140,9 +141,9 @@ export default function CompetitionDetailPage() {
 
   useEffect(() => { fetchComp(); }, [fetchComp]);
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 15s for live updates
   useEffect(() => {
-    const interval = setInterval(fetchComp, 30000);
+    const interval = setInterval(fetchComp, 15000);
     return () => clearInterval(interval);
   }, [fetchComp]);
 
@@ -161,8 +162,10 @@ export default function CompetitionDetailPage() {
 
   const scenarioInfo = comp?.scenario ? scenarios.find((s) => s.id === comp.scenario) : null;
   const isCompleted = comp?.status === "completed";
-  const daysRemaining = comp ? Math.max(0, comp.totalDays - comp.currentDay) : 0;
-  const progressPct = comp ? Math.round((comp.currentDay / comp.totalDays) * 100) : 0;
+  const totalIntervals = comp ? comp.totalDays * 26 : 1;
+  const currentIntervals = comp ? comp.currentDay * 26 + (comp.currentInterval ?? 0) : 0;
+  const progressPct = comp ? Math.round((currentIntervals / totalIntervals) * 100) : 0;
+  const hoursRemaining = comp ? Math.max(0, Math.round((totalIntervals - currentIntervals) * 15 / 60)) : 0;
 
   // ─── Trade handlers ──────────────────────────────────────────────────────
 
@@ -221,15 +224,37 @@ export default function CompetitionDetailPage() {
   // ─── Chart data ──────────────────────────────────────────────────────────
 
   const chartData = useMemo(() => {
-    if (!comp || comp.participants.length < 2) return null;
+    if (!comp || comp.participants.length === 0) return null;
 
     const dayMap = new Map<number, Record<string, number>>();
+
+    // Day 0 = starting cash
+    const startRow: Record<string, number> = { day: 0 };
+    for (const p of comp.participants) {
+      startRow[p.userId] = comp.startingCash;
+    }
+    dayMap.set(0, startRow);
+
+    // All snapshots (including intraday fractional days)
     for (const p of comp.participants) {
       for (const snap of p.valueHistory) {
         const row = dayMap.get(snap.day) ?? { day: snap.day };
         row[p.userId] = snap.value;
         dayMap.set(snap.day, row);
       }
+    }
+
+    // Add current live values
+    const liveFrac = Math.round((comp.currentDay + (comp.currentInterval ?? 0) / 26) * 100) / 100;
+    if (liveFrac > 0) {
+      const liveRow = dayMap.get(liveFrac) ?? { day: liveFrac };
+      for (const p of comp.participants) {
+        const totalValue = Math.round(
+          (p.cash + p.holdings.reduce((s, h) => s + h.amount, 0)) * 100
+        ) / 100;
+        liveRow[p.userId] = totalValue;
+      }
+      dayMap.set(liveFrac, liveRow);
     }
 
     const data = Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
@@ -239,7 +264,13 @@ export default function CompetitionDetailPage() {
       color: LINE_COLORS[i % LINE_COLORS.length],
     }));
 
-    return { data, lines };
+    // Integer day ticks for X-axis
+    const maxDay = comp.totalDays;
+    const ticks = Array.from({ length: Math.min(maxDay + 1, 15) }, (_, i) =>
+      Math.round((i * maxDay) / Math.min(maxDay, 14))
+    ).filter((v, i, a) => a.indexOf(v) === i);
+
+    return { data, lines, ticks, maxDay };
   }, [comp]);
 
   // ─── Filtered trade assets ───────────────────────────────────────────────
@@ -306,12 +337,16 @@ export default function CompetitionDetailPage() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              Day {comp.currentDay} of {comp.totalDays}
+              Day {comp.currentDay}{comp.currentInterval > 0 ? `.${Math.round((comp.currentInterval / 26) * 10)}` : ""} of {comp.totalDays}
               {" · "}
               {timeframeLabels[comp.timeframe as Timeframe]}
+              {" · "}
+              Updates every 15 min
             </span>
             <span className="text-muted-foreground">
-              {isCompleted ? "Finished" : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} remaining`}
+              {isCompleted ? "Finished" : hoursRemaining >= 24
+                ? `${Math.floor(hoursRemaining / 24)}d ${hoursRemaining % 24}h remaining`
+                : `${hoursRemaining}h remaining`}
             </span>
           </div>
           <div className="h-2 rounded-full bg-accent/60 overflow-hidden">
@@ -543,6 +578,9 @@ export default function CompetitionDetailPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis
                       dataKey="day"
+                      type="number"
+                      domain={[0, chartData.maxDay]}
+                      ticks={chartData.ticks}
                       tick={{ fontSize: 10 }}
                       tickFormatter={(d: number) => `D${d}`}
                       stroke="var(--color-muted-foreground)"

@@ -20,6 +20,7 @@ export interface IPortfolio extends Document {
   baselineDate: string;
   totalDeposited: number;
   baselineDeposited: number;
+  lastSimulatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +52,7 @@ const PortfolioSchema = new Schema<IPortfolio>(
     baselineDate: { type: String, default: "" },
     totalDeposited: { type: Number, default: 0 },
     baselineDeposited: { type: Number, default: 0 },
+    lastSimulatedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

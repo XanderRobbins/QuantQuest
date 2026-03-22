@@ -28,6 +28,7 @@ export interface ICompetition extends Document {
   timeframe: "1w" | "1m" | "3m" | "2y";
   startingCash: number;
   currentDay: number;
+  currentInterval: number;
   totalDays: number;
   startedAt: Date | null;
   createdBy: string | null;
@@ -77,6 +78,7 @@ const CompetitionSchema = new Schema<ICompetition>(
     timeframe: { type: String, enum: ["1w", "1m", "3m", "2y"], required: true },
     startingCash: { type: Number, default: 10000 },
     currentDay: { type: Number, default: 0 },
+    currentInterval: { type: Number, default: 0 },
     totalDays: { type: Number, required: true },
     startedAt: { type: Date, default: null },
     createdBy: { type: String, default: null },

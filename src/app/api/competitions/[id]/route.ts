@@ -5,52 +5,101 @@ import { getDayMultiplier, type Timeframe } from "@/data/scenarios";
 
 // ─── Simulation engine ──────────────────────────────────────────────────────
 
+/** Each simulation "day" is split into 26 intervals of 15 minutes (6.5 trading hours) */
+const INTERVALS_PER_DAY = 26;
+const MS_PER_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
 function advanceSimulation(competition: ICompetition) {
   if (!competition.startedAt || competition.status === "completed") return;
 
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const elapsed = Math.floor(
-    (Date.now() - new Date(competition.startedAt).getTime()) / msPerDay
-  );
-  const targetDay = Math.min(elapsed, competition.totalDays);
+  const elapsed = Date.now() - new Date(competition.startedAt).getTime();
+  const totalIntervalsElapsed = Math.floor(elapsed / MS_PER_INTERVAL);
 
-  if (targetDay <= competition.currentDay) return;
+  // Where we are now
+  const targetDay = Math.floor(totalIntervalsElapsed / INTERVALS_PER_DAY);
+  const targetInterval = totalIntervalsElapsed % INTERVALS_PER_DAY;
+
+  // Where we were
+  const currentTotal = competition.currentDay * INTERVALS_PER_DAY + (competition.currentInterval ?? 0);
+  const targetTotal = Math.min(
+    targetDay * INTERVALS_PER_DAY + targetInterval,
+    competition.totalDays * INTERVALS_PER_DAY
+  );
+
+  // Nothing new to simulate
+  if (targetTotal <= currentTotal) return;
 
   const scenarioId = competition.scenario;
   const timeframe = competition.timeframe as Timeframe;
 
-  while (competition.currentDay < targetDay) {
-    competition.currentDay++;
-    const day = competition.currentDay;
+  // Apply returns for each interval we've missed
+  let simDay = competition.currentDay;
+  let simInterval = competition.currentInterval ?? 0;
+
+  for (let i = currentTotal; i < targetTotal; i++) {
+    simInterval++;
+    if (simInterval >= INTERVALS_PER_DAY) {
+      simInterval = 0;
+      simDay++;
+    }
+
+    // Cap at totalDays
+    if (simDay >= competition.totalDays) {
+      simDay = competition.totalDays;
+      break;
+    }
+
+    // The "day" whose returns we're applying (1-indexed for getDayMultiplier)
+    const applyDay = simDay + 1;
 
     for (const participant of competition.participants) {
-      // Apply daily returns to each holding
       if (scenarioId) {
         for (const holding of participant.holdings) {
-          const mult = getDayMultiplier(
+          const dayMult = getDayMultiplier(
             scenarioId,
             timeframe,
             holding.assetId,
-            day,
+            Math.min(applyDay, competition.totalDays),
             competition.totalDays
           );
-          holding.amount = Math.round(holding.amount * mult * 100) / 100;
+          // Apply 1/26th of the day's return per interval
+          const intervalMult = 1 + (dayMult - 1) / INTERVALS_PER_DAY;
+          holding.amount = Math.round(holding.amount * intervalMult * 100) / 100;
         }
       }
+    }
 
-      // Snapshot total value
+    // Snapshot value every interval (fractional day for intraday chart resolution)
+    const fractionalDay = Math.round((simDay + simInterval / INTERVALS_PER_DAY) * 100) / 100;
+    for (const participant of competition.participants) {
       const totalValue =
         Math.round(
           (participant.cash +
             participant.holdings.reduce((s, h) => s + h.amount, 0)) *
             100
         ) / 100;
-      participant.valueHistory.push({ day, value: totalValue });
+      participant.valueHistory.push({ day: fractionalDay, value: totalValue });
     }
   }
 
+  competition.currentDay = simDay;
+  competition.currentInterval = simInterval;
+
   if (competition.currentDay >= competition.totalDays) {
     competition.status = "completed";
+    // Final snapshot if not already added
+    for (const participant of competition.participants) {
+      const lastSnap = participant.valueHistory[participant.valueHistory.length - 1];
+      if (!lastSnap || lastSnap.day !== competition.totalDays) {
+        const totalValue =
+          Math.round(
+            (participant.cash +
+              participant.holdings.reduce((s, h) => s + h.amount, 0)) *
+              100
+          ) / 100;
+        participant.valueHistory.push({ day: competition.totalDays, value: totalValue });
+      }
+    }
   }
 }
 

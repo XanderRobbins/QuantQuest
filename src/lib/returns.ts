@@ -11,51 +11,63 @@ function getNoiseScale(holdingId: string): number {
   return 0.01; // ±1% for sectors (equities)
 }
 
+/** Number of 15-minute intervals in a trading day (6.5 hours) */
+const INTERVALS_PER_DAY = 26;
+
 /**
- * Look up the annualized return for a holding and convert to a daily rate.
+ * Look up the annualized return for a holding and convert to a per-interval rate
+ * (one interval = 15 minutes). This is called every 15 minutes instead of daily.
  * Sectors and strategies use return1Y (percentage), safeties use apy.
  */
-export function getExpectedDailyReturn(holdingId: string): number {
+export function getExpectedIntervalReturn(holdingId: string): number {
   const sector = sectors.find((s) => s.id === holdingId);
-  if (sector) return sector.return1Y / 100 / 252;
+  if (sector) return sector.return1Y / 100 / 252 / INTERVALS_PER_DAY;
 
   const strategy = strategies.find((s) => s.id === holdingId);
-  if (strategy) return strategy.return1Y / 100 / 252;
+  if (strategy) return strategy.return1Y / 100 / 252 / INTERVALS_PER_DAY;
 
   const safety = safeties.find((s) => s.id === holdingId);
-  if (safety) return safety.apy / 100 / 365;
+  if (safety) return safety.apy / 100 / 365 / INTERVALS_PER_DAY;
 
   return 0;
 }
 
+/** @deprecated Use getExpectedIntervalReturn instead */
+export function getExpectedDailyReturn(holdingId: string): number {
+  return getExpectedIntervalReturn(holdingId) * INTERVALS_PER_DAY;
+}
+
 /**
- * Apply one day of returns to every holding in the portfolio.
+ * Apply one interval (15 minutes) of returns to every holding in the portfolio.
  * For sector holdings, attempts to use live Yahoo Finance data.
- * Falls back to expected daily return + noise if live data unavailable.
+ * Falls back to expected interval return + noise if live data unavailable.
  *
  * Mutates `holdings` in place and returns the updated array.
  */
 export async function simulateReturns(holdings: IHolding[]): Promise<IHolding[]> {
+  const intervalNoiseScale = 1 / Math.sqrt(INTERVALS_PER_DAY); // Scale noise down for shorter intervals
+
   for (const holding of holdings) {
     if (holding.id === "cash") {
-      const dailyReturn = getExpectedDailyReturn(holding.id);
-      holding.amount = holding.amount * (1 + dailyReturn);
+      const intervalReturn = getExpectedIntervalReturn(holding.id);
+      holding.amount = holding.amount * (1 + intervalReturn);
     } else {
       // Try live market data for sector holdings
-      let dailyReturn: number | null = null;
+      let liveChange: number | null = null;
       try {
-        dailyReturn = await getLiveDailyChange(holding.id);
+        liveChange = await getLiveDailyChange(holding.id);
       } catch {
         // Live data unavailable
       }
 
-      if (dailyReturn !== null) {
-        // Use real market daily change
-        holding.amount = holding.amount * (1 + dailyReturn);
+      if (liveChange !== null) {
+        // Scale live daily change to a 15-min interval
+        const intervalChange = liveChange / INTERVALS_PER_DAY;
+        holding.amount = holding.amount * (1 + intervalChange);
       } else {
-        // Fallback: expected return + noise scaled to asset type
-        const expected = getExpectedDailyReturn(holding.id);
-        const noise = (Math.random() - 0.5) * getNoiseScale(holding.id);
+        // Fallback: expected interval return + scaled noise
+        const expected = getExpectedIntervalReturn(holding.id);
+        const noise = (Math.random() - 0.5) * getNoiseScale(holding.id) * intervalNoiseScale;
         holding.amount = holding.amount * (1 + expected + noise);
       }
     }
